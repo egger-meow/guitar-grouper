@@ -4,6 +4,7 @@
   "main": "workers/app.ts",
   "compatibility_date": "2026-09-27",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS"
@@ -19,7 +20,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["RoomDO"]
+      "new_sqlite_classes": ["RoomDO"]
     }
   ],
   "routes": [
