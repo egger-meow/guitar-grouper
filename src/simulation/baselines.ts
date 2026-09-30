@@ -18,30 +18,8 @@ import {
 } from '../engine/similarity';
 import { ROLES, ROLE_MAP } from '../engine/taxonomy';
 import { createPrng } from '../engine/prng';
-
-/**
- * Calculates optimal group count K and target group capacities
- */
-export function calculateGroupCapacities(
-  participantCount: number,
-  targetGroupSize: number
-): { K: number; capacities: number[] } {
-  if (participantCount <= 0) {
-    return { K: 0, capacities: [] };
-  }
-
-  const S = Math.max(1, targetGroupSize || 4);
-  const K = Math.max(1, Math.floor(participantCount / S));
-  const baseSize = Math.floor(participantCount / K);
-  const remainder = participantCount % K;
-
-  const capacities: number[] = new Array(K);
-  for (let i = 0; i < K; i++) {
-    capacities[i] = i < remainder ? baseSize + 1 : baseSize;
-  }
-
-  return { K, capacities };
-}
+export { calculateGroupCapacities } from '../engine/optimizer';
+import { calculateGroupCapacities } from '../engine/optimizer';
 
 /**
  * Builds standard OptimizationResult from any partition of participants
@@ -138,7 +116,7 @@ export function runRandomBaseline(
 
   const { K, capacities } = calculateGroupCapacities(
     participants.length,
-    settings.targetGroupSize
+    settings
   );
 
   const prng = createPrng(seed);
@@ -190,7 +168,7 @@ export function runNaiveGreedyBaseline(
 
   const { K, capacities } = calculateGroupCapacities(
     participants.length,
-    settings.targetGroupSize
+    settings
   );
 
   const desiredRoles: Role[] =

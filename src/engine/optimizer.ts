@@ -46,19 +46,123 @@ interface CachedGroupEval {
 }
 
 /**
- * Calculates optimal group count K and target group capacities
+ * Calculates optimal group count K and target group capacities for a given participant count
+ * and target group size or range [minGroupSize, maxGroupSize].
  * Ensures |size(Gi) - size(Gj)| <= 1 at all times.
  */
-function calculateGroupCapacities(
+export function calculateGroupCapacities(
   participantCount: number,
-  targetGroupSize: number
+  targetOrSettings: number | Partial<HostSettings>
 ): { K: number; capacities: number[] } {
   if (participantCount <= 0) {
     return { K: 0, capacities: [] };
   }
 
-  const S = Math.max(1, targetGroupSize || 4);
-  const K = Math.max(1, Math.floor(participantCount / S));
+  // If number or only targetGroupSize is provided without min/max range
+  if (typeof targetOrSettings === 'number') {
+    const S = Math.max(1, targetOrSettings || 4);
+    const K = Math.max(1, Math.floor(participantCount / S));
+    const baseSize = Math.floor(participantCount / K);
+    const remainder = participantCount % K;
+    const capacities: number[] = new Array(K);
+    for (let i = 0; i < K; i++) {
+      capacities[i] = i < remainder ? baseSize + 1 : baseSize;
+    }
+    return { K, capacities };
+  }
+
+  const minGroupSize = targetOrSettings.minGroupSize;
+  const maxGroupSize = targetOrSettings.maxGroupSize;
+  const targetGroupSize = targetOrSettings.targetGroupSize;
+
+  // If min and max are not provided, fall back to targetGroupSize
+  if (minGroupSize === undefined && maxGroupSize === undefined) {
+    const S = Math.max(1, targetGroupSize || 4);
+    const K = Math.max(1, Math.floor(participantCount / S));
+    const baseSize = Math.floor(participantCount / K);
+    const remainder = participantCount % K;
+    const capacities: number[] = new Array(K);
+    for (let i = 0; i < K; i++) {
+      capacities[i] = i < remainder ? baseSize + 1 : baseSize;
+    }
+    return { K, capacities };
+  }
+
+  const minSize = Math.max(1, minGroupSize ?? (targetGroupSize ? targetGroupSize - 1 : 3));
+  const maxSize = Math.max(minSize, maxGroupSize ?? (targetGroupSize ? targetGroupSize + 1 : 5));
+  const idealSize = targetGroupSize ?? Math.round((minSize + maxSize) / 2);
+
+  // If minSize === maxSize, strict target
+  if (minSize === maxSize) {
+    const K = Math.max(1, Math.floor(participantCount / minSize));
+    const baseSize = Math.floor(participantCount / K);
+    const remainder = participantCount % K;
+    const capacities: number[] = new Array(K);
+    for (let i = 0; i < K; i++) {
+      capacities[i] = i < remainder ? baseSize + 1 : baseSize;
+    }
+    return { K, capacities };
+  }
+
+  // Baseline target K from floor(N / idealSize)
+  const defaultK = Math.max(1, Math.floor(participantCount / idealSize));
+  const defaultBase = Math.floor(participantCount / defaultK);
+  const defaultRem = participantCount % defaultK;
+  const defaultMin = defaultBase;
+  const defaultMax = defaultRem > 0 ? defaultBase + 1 : defaultBase;
+
+  // If defaultK perfectly satisfies the [minSize, maxSize] range, preserve it!
+  if (defaultMin >= minSize && defaultMax <= maxSize) {
+    const capacities: number[] = new Array(defaultK);
+    for (let i = 0; i < defaultK; i++) {
+      capacities[i] = i < defaultRem ? defaultBase + 1 : defaultBase;
+    }
+    return { K: defaultK, capacities };
+  }
+
+  // Otherwise, find candidate Ks that minimize violations of [minSize, maxSize]
+  const minK = Math.max(1, Math.ceil(participantCount / maxSize));
+  const maxK = Math.max(1, Math.floor(participantCount / minSize));
+
+  const candidateKs = new Set<number>();
+  if (minK <= maxK) {
+    for (let k = minK; k <= maxK; k++) {
+      candidateKs.add(k);
+    }
+  } else {
+    candidateKs.add(Math.max(1, minK));
+    candidateKs.add(Math.max(1, maxK));
+    candidateKs.add(defaultK);
+    candidateKs.add(1);
+  }
+
+  let bestK = defaultK;
+  let minPenalty = Infinity;
+
+  for (const k of candidateKs) {
+    const baseSize = Math.floor(participantCount / k);
+    const rem = participantCount % k;
+    const actualMin = baseSize;
+    const actualMax = rem > 0 ? baseSize + 1 : baseSize;
+
+    let penalty = 0;
+    if (actualMin < minSize) {
+      penalty += (minSize - actualMin) * 1000;
+    }
+    if (actualMax > maxSize) {
+      penalty += (actualMax - maxSize) * 1000;
+    }
+
+    // Proximity to defaultK
+    penalty += Math.abs(k - defaultK) * 10;
+
+    if (penalty < minPenalty) {
+      minPenalty = penalty;
+      bestK = k;
+    }
+  }
+
+  const K = bestK;
   const baseSize = Math.floor(participantCount / K);
   const remainder = participantCount % K;
 
@@ -921,10 +1025,9 @@ export function optimizeGrouping(
   const prng = createPrng(seed !== undefined ? seed : 42);
 
   // Group capacity planning
-  const targetGroupSize = settings.targetGroupSize || 4;
   const { K, capacities } = calculateGroupCapacities(
     participants.length,
-    targetGroupSize
+    settings
   );
 
   const desiredRoles: Role[] =

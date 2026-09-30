@@ -224,6 +224,8 @@ export function getTagNameZh(id: string): string {
  */
 export const DEFAULT_HOST_SETTINGS: HostSettings = {
   targetGroupSize: 4,
+  minGroupSize: 3,
+  maxGroupSize: 5,
   preset: 'balanced',
   weights: {
     role: 0.45,

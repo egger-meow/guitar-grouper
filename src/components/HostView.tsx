@@ -28,7 +28,10 @@ import {
   KeyRound,
   ShieldCheck,
   Link as LinkIcon,
+  Minus,
+  Plus,
 } from 'lucide-react';
+import { calculateGroupCapacities } from '../engine/optimizer';
 
 export interface HostViewProps {
   roomCode: string;
@@ -95,9 +98,55 @@ export function HostView({
     });
   };
 
-  const handleSizeChange = (size: number) => {
+  const currentMin = settings.minGroupSize ?? 3;
+  const currentMax = settings.maxGroupSize ?? 5;
+  const currentTarget = settings.targetGroupSize ?? Math.round((currentMin + currentMax) / 2);
+
+  const { K: estimatedK, capacities: estimatedCapacities } = calculateGroupCapacities(
+    participantCount,
+    {
+      minGroupSize: currentMin,
+      maxGroupSize: currentMax,
+      targetGroupSize: currentTarget,
+    }
+  );
+  const minCap = estimatedCapacities.length > 0 ? Math.min(...estimatedCapacities) : currentMin;
+  const maxCap = estimatedCapacities.length > 0 ? Math.max(...estimatedCapacities) : currentMax;
+
+  const handleRangePreset = (min: number, max: number) => {
+    const target = Math.round((min + max) / 2);
     onUpdateSettings({
-      targetGroupSize: Math.max(2, Math.min(8, size)),
+      minGroupSize: min,
+      maxGroupSize: max,
+      targetGroupSize: target,
+    });
+  };
+
+  const handleMinChange = (delta: number) => {
+    let newMin = Math.max(2, Math.min(8, currentMin + delta));
+    let newMax = currentMax;
+    if (newMin > newMax) {
+      newMax = newMin;
+    }
+    const target = Math.round((newMin + newMax) / 2);
+    onUpdateSettings({
+      minGroupSize: newMin,
+      maxGroupSize: newMax,
+      targetGroupSize: target,
+    });
+  };
+
+  const handleMaxChange = (delta: number) => {
+    let newMax = Math.max(2, Math.min(8, currentMax + delta));
+    let newMin = currentMin;
+    if (newMax < newMin) {
+      newMin = newMax;
+    }
+    const target = Math.round((newMin + newMax) / 2);
+    onUpdateSettings({
+      minGroupSize: newMin,
+      maxGroupSize: newMax,
+      targetGroupSize: target,
     });
   };
 
@@ -290,26 +339,117 @@ export function HostView({
               <span>分組演算法設定</span>
             </div>
 
-            {/* Target Group Size */}
-            <div className="space-y-2">
-              <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider block">
-                目標每組人數 (3-5 人)
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {[3, 4, 5].map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    onClick={() => handleSizeChange(size)}
-                    className={`py-2.5 rounded-xl font-bold text-sm border transition-all cursor-pointer ${
-                      settings.targetGroupSize === size
-                        ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md'
-                        : 'bg-slate-800 hover:bg-slate-700/80 text-slate-300 border-slate-700'
-                    }`}
-                  >
-                    {size} 人一組
-                  </button>
-                ))}
+            {/* Group Size Range Selector */}
+            <div className="space-y-3 bg-slate-950/40 p-4 rounded-2xl border border-slate-800/80">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-white text-xs font-bold uppercase tracking-wider block">
+                    每組人數範圍
+                  </label>
+                  <p className="text-slate-400 text-[11px]">由演算法在此區間內動態分配最平衡人數</p>
+                </div>
+                <div className="px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-amber-300 font-mono font-bold text-sm tracking-wide shadow-sm">
+                  {currentMin === currentMax ? `${currentMin} 人` : `${currentMin} ~ ${currentMax} 人`}
+                </div>
+              </div>
+
+              {/* Quick Range Presets */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { min: 3, max: 5, label: '3 ~ 5 人', desc: '標準熱門團 (推薦)' },
+                  { min: 3, max: 4, label: '3 ~ 4 人', desc: '精實三四重奏' },
+                  { min: 4, max: 6, label: '4 ~ 6 人', desc: '大編制樂團' },
+                  { min: 2, max: 4, label: '2 ~ 4 人', desc: '不插電小編制' },
+                ].map((preset) => {
+                  const active = currentMin === preset.min && currentMax === preset.max;
+                  return (
+                    <button
+                      key={`${preset.min}-${preset.max}`}
+                      type="button"
+                      onClick={() => handleRangePreset(preset.min, preset.max)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        active
+                          ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-bold ring-2 ring-amber-400/30'
+                          : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700/80'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{preset.label}</div>
+                      <div className={`text-[10px] ${active ? 'text-slate-900 font-medium' : 'text-slate-400'}`}>
+                        {preset.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Custom Min / Max Steppers */}
+              <div className="pt-2 border-t border-slate-800/60 grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-semibold text-slate-400 block">最少人數 (下限)</span>
+                  <div className="flex items-center justify-between bg-slate-800 rounded-xl p-1 border border-slate-700">
+                    <button
+                      type="button"
+                      disabled={currentMin <= 2}
+                      onClick={() => handleMinChange(-1)}
+                      className="w-8 h-8 rounded-lg bg-slate-700/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center cursor-pointer transition-all active:scale-95"
+                      title="減少最少人數"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="font-mono font-bold text-sm text-amber-300">{currentMin} 人</span>
+                    <button
+                      type="button"
+                      disabled={currentMin >= 7}
+                      onClick={() => handleMinChange(1)}
+                      className="w-8 h-8 rounded-lg bg-slate-700/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center cursor-pointer transition-all active:scale-95"
+                      title="增加最少人數"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[11px] font-semibold text-slate-400 block">最多人數 (上限)</span>
+                  <div className="flex items-center justify-between bg-slate-800 rounded-xl p-1 border border-slate-700">
+                    <button
+                      type="button"
+                      disabled={currentMax <= 2}
+                      onClick={() => handleMaxChange(-1)}
+                      className="w-8 h-8 rounded-lg bg-slate-700/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center cursor-pointer transition-all active:scale-95"
+                      title="減少最多人數"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="font-mono font-bold text-sm text-amber-300">{currentMax} 人</span>
+                    <button
+                      type="button"
+                      disabled={currentMax >= 8}
+                      onClick={() => handleMaxChange(1)}
+                      className="w-8 h-8 rounded-lg bg-slate-700/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center cursor-pointer transition-all active:scale-95"
+                      title="增加最多人數"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Group Count & Capacity Projection */}
+              <div className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-300 flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                {participantCount >= 2 ? (
+                  <span>
+                    目前 <strong className="text-white">{participantCount}</strong> 人：預計分成{' '}
+                    <strong className="text-emerald-400">{estimatedK}</strong> 組（每組約{' '}
+                    <span className="text-amber-300 font-mono font-bold">
+                      {minCap === maxCap ? `${minCap}` : `${minCap} ~ ${maxCap}`}
+                    </span>{' '}
+                    人）
+                  </span>
+                ) : (
+                  <span>人數範圍設定完成，社員加入時將自動動態預估組數</span>
+                )}
               </div>
             </div>
 

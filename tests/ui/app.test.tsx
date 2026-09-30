@@ -204,6 +204,57 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       expect(screen.getByText(/已授權/i)).toBeTruthy();
       expect(screen.getByRole('button', { name: /複製主辦連結/i })).toBeTruthy();
     });
+
+    it('allows room leader to select group size range presets and fine-tune min/max bounds', () => {
+      const onUpdateSettings = vi.fn();
+
+      render(
+        <HostView
+          roomCode="PASS"
+          hostSecret="valid_secret_xyz"
+          participantCount={12}
+          participants={mockParticipants}
+          settings={{
+            ...mockSettings,
+            minGroupSize: 3,
+            maxGroupSize: 5,
+            targetGroupSize: 4,
+          }}
+          status="WAITING"
+          onStartGrouping={vi.fn()}
+          onUpdateSettings={onUpdateSettings}
+        />
+      );
+
+      // Check range header and badge
+      expect(screen.getByText(/每組人數範圍/i)).toBeTruthy();
+      expect(screen.getAllByText(/3 ~ 5 人/).length).toBeGreaterThanOrEqual(1);
+
+      // Select preset "4 ~ 6 人"
+      const preset46 = screen.getByRole('button', { name: /4 ~ 6 人/i });
+      fireEvent.click(preset46);
+
+      expect(onUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          minGroupSize: 4,
+          maxGroupSize: 6,
+          targetGroupSize: 5,
+        })
+      );
+
+      // Click stepper to decrease min group size
+      const decMinBtn = screen.getByTitle(/減少最少人數/i);
+      fireEvent.click(decMinBtn);
+      expect(onUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          minGroupSize: 2,
+        })
+      );
+
+      // Dynamic projection badge displayed for 12 participants
+      expect(screen.getByText(/目前/i)).toBeTruthy();
+      expect(screen.getByText(/預計分成/i)).toBeTruthy();
+    });
   });
 
   describe('3. Participant Form', () => {

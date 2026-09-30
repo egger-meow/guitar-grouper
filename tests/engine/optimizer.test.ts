@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { optimizeGrouping } from '../../src/engine/optimizer';
+import { optimizeGrouping, calculateGroupCapacities } from '../../src/engine/optimizer';
 import { createPrng } from '../../src/engine/prng';
 import type { Participant, HostSettings, Role } from '../../src/types/domain';
 
@@ -186,6 +186,51 @@ describe('Grouping Optimizer (Constructive Seeding + Simulated Annealing + Diagn
 
       const sizes = result.groups.map((g) => g.members.length);
       expect(sizes).toEqual([4, 4, 4]);
+    });
+
+    it('partitions 23 participants into sensible 4/4/5/5/5 distribution within [3, 5] range', () => {
+      const participants: Participant[] = Array.from({ length: 23 }, (_, i) => ({
+        id: `p-${i + 1}`,
+        name: `社員${i + 1}`,
+        gender: i % 2 === 0 ? 'M' : 'F',
+        capabilities: ['acoustic_guitar'],
+        musicPreferences: ['mandopop_ballad'],
+        joinedAt: i + 1,
+      }));
+
+      const settings: HostSettings = {
+        ...baseSettings,
+        minGroupSize: 3,
+        maxGroupSize: 5,
+        targetGroupSize: 4,
+      };
+
+      const result = optimizeGrouping(participants, settings, 42);
+      expect(result.groups.length).toBe(5);
+
+      const sizes = result.groups.map((g) => g.members.length).sort((a, b) => b - a);
+      expect(sizes).toEqual([5, 5, 5, 4, 4]);
+      for (const size of sizes) {
+        expect(size).toBeGreaterThanOrEqual(3);
+        expect(size).toBeLessThanOrEqual(5);
+      }
+    });
+
+    it('supports custom leader ranges such as [4, 6] and [2, 4] via calculateGroupCapacities', () => {
+      // 17 participants with range [4, 6]
+      const cap46 = calculateGroupCapacities(17, { minGroupSize: 4, maxGroupSize: 6, targetGroupSize: 5 });
+      expect(cap46.K).toBe(3);
+      expect(cap46.capacities).toEqual([6, 6, 5]);
+
+      // 10 participants with range [2, 4]
+      const cap24 = calculateGroupCapacities(10, { minGroupSize: 2, maxGroupSize: 4, targetGroupSize: 3 });
+      expect(cap24.K).toBe(3);
+      expect(cap24.capacities).toEqual([4, 3, 3]);
+
+      // 7 participants with range [3, 4]
+      const cap34 = calculateGroupCapacities(7, { minGroupSize: 3, maxGroupSize: 4, targetGroupSize: 3 });
+      expect(cap34.K).toBe(2);
+      expect(cap34.capacities).toEqual([4, 3]);
     });
   });
 

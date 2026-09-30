@@ -42,6 +42,8 @@ export type GenreGranularity = 'coarse' | 'fine';
 
 export interface HostSettings {
   targetGroupSize: number;
+  minGroupSize?: number;
+  maxGroupSize?: number;
   preset: PresetType;
   weights: {
     role: number;
