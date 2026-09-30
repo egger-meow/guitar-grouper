@@ -113,7 +113,7 @@ export function HostView({
   });
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-6 space-y-8 animate-fadeIn">
+    <div className="w-full max-w-5xl mx-auto px-4 py-6 pb-28 sm:pb-8 space-y-6 sm:space-y-8 animate-fadeIn">
       {/* Top Banner: Big Kahoot-Style Room Code */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 via-slate-900 to-purple-950 border border-indigo-700/40 p-6 md:p-8 shadow-2xl">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -533,6 +533,33 @@ export function HostView({
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Sticky Host Action Bar */}
+      {status === 'WAITING' && (
+        <div className="fixed sm:hidden bottom-0 left-0 right-0 p-3 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800/90 z-40 pb-safe shadow-2xl">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] text-slate-400 font-medium">現場進房統計</div>
+              <div className="text-sm font-extrabold text-amber-400">
+                {participantCount} 位社員就位
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={!canStart}
+              onClick={onStartGrouping}
+              className={`py-3 px-5 rounded-xl font-black text-sm flex items-center gap-2 transition-all shadow-lg active:scale-95 touch-manipulation cursor-pointer ${
+                canStart
+                  ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-slate-950 shadow-emerald-500/20'
+                  : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+              }`}
+            >
+              <Play className="w-4 h-4 fill-current" />
+              <span>開始分組</span>
+            </button>
           </div>
         </div>
       )}

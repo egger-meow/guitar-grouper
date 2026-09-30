@@ -99,8 +99,8 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       expect(screen.getByRole('button', { name: /樂器配置優先/i })).toBeTruthy();
       expect(screen.getByRole('button', { name: /均衡模式|平衡/i })).toBeTruthy();
 
-      // Start Grouping button
-      const startBtn = screen.getByRole('button', { name: /開始分組/i });
+      // Start Grouping button (available on desktop and mobile sticky bar)
+      const startBtn = screen.getAllByRole('button', { name: /開始分組/i })[0];
       expect(startBtn).toBeTruthy();
       expect(startBtn.hasAttribute('disabled')).toBe(false);
 
@@ -124,8 +124,8 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
         />
       );
 
-      const startBtn = screen.getByRole('button', { name: /開始分組/i });
-      expect(startBtn.hasAttribute('disabled')).toBe(true);
+      const startBtns = screen.getAllByRole('button', { name: /開始分組/i });
+      expect(startBtns[0].hasAttribute('disabled')).toBe(true);
       expect(screen.getByText(/至少需要 2 位成員/i)).toBeTruthy();
     });
   });
@@ -279,8 +279,8 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       expect(screen.getByText(/流行抒情/)).toBeTruthy();
       expect(screen.getByText(/雙主唱高音互補/)).toBeTruthy();
 
-      // Copy lineup button
-      expect(screen.getByRole('button', { name: /複製本組名單|複製分組資訊/i })).toBeTruthy();
+      // Copy lineup button (available in hero and mobile sticky action bar)
+      expect(screen.getAllByRole('button', { name: /複製本組名單|複製分組資訊/i }).length).toBeGreaterThanOrEqual(1);
     });
   });
 

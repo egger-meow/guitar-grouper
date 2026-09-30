@@ -165,7 +165,7 @@ export function ParticipantView({
     <div className="w-full max-w-xl mx-auto px-4 py-6 animate-fadeIn">
       <form
         onSubmit={handleSubmit}
-        className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6"
+        className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-8 pb-28 sm:pb-8 shadow-2xl space-y-6"
       >
         <div className="border-b border-slate-800 pb-4">
           <div className="flex items-center justify-between mb-1">
@@ -313,13 +313,22 @@ export function ParticipantView({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜尋歌手或曲風（例如：周杰倫、Yorushika、告五人）"
-              className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-400"
+              placeholder="搜尋歌手或曲風（例如：周杰倫、Yorushika、白小白）"
+              className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-400"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* Artists / Genres Pills Grid */}
-          <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1 bg-slate-950/50 rounded-2xl border border-slate-800">
+          <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto p-2 bg-slate-950/50 rounded-2xl border border-slate-800 touch-pan-y">
             {filteredArtists.map((artist) => {
               const isSelected = selectedMusic.includes(artist.id);
               return (
@@ -327,7 +336,7 @@ export function ParticipantView({
                   key={artist.id}
                   type="button"
                   onClick={() => toggleMusic(artist.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 touch-manipulation ${
                     isSelected
                       ? 'bg-purple-900/60 border-purple-400 text-purple-200 shadow-md ring-1 ring-purple-400/50'
                       : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-300'
@@ -342,17 +351,33 @@ export function ParticipantView({
         </div>
 
         {validationError && (
-          <div className="p-3 rounded-xl bg-red-900/30 border border-red-700/50 text-red-300 text-xs text-center font-medium">
+          <div className="p-3 rounded-xl bg-red-900/30 border border-red-700/50 text-red-300 text-xs text-center font-medium animate-shake">
             {validationError}
           </div>
         )}
 
-        <button
-          type="submit"
-          className="w-full py-4 px-6 rounded-2xl font-black text-lg bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-slate-950 hover:shadow-lg hover:shadow-emerald-500/25 active:scale-98 transition-all cursor-pointer"
-        >
-          🎸 加入房間
-        </button>
+        {/* Sticky Mobile Submit Bar (Fixed on phone, inline on desktop) */}
+        <div className="fixed sm:static bottom-0 left-0 right-0 p-4 sm:p-0 bg-slate-950/95 sm:bg-transparent backdrop-blur-lg sm:backdrop-blur-none border-t border-slate-800/90 sm:border-0 z-40 pb-safe shadow-2xl">
+          <div className="max-w-xl mx-auto flex items-center gap-3">
+            <div className="sm:hidden flex-1 min-w-0 text-left">
+              <div className="text-[11px] text-slate-400 font-medium truncate">
+                {selectedRoles.length > 0
+                  ? `已選 ${selectedRoles.length} 項樂器`
+                  : '請勾選樂器'}
+                {selectedMusic.length > 0 ? ` · ${selectedMusic.length} 首/歌手` : ''}
+              </div>
+              <div className="text-xs font-extrabold text-amber-400 truncate">
+                {name.trim() ? name : '尚未輸入暱稱'}
+              </div>
+            </div>
+            <button
+              type="submit"
+              className="flex-1 sm:w-full py-3.5 sm:py-4 px-6 rounded-2xl font-black text-base sm:text-lg bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-slate-950 hover:shadow-lg hover:shadow-emerald-500/25 active:scale-95 transition-all cursor-pointer shadow-lg shadow-emerald-500/10 touch-manipulation"
+            >
+              🎸 加入房間
+            </button>
+          </div>
+        </div>
       </form>
     </div>
   );

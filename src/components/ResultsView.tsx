@@ -87,7 +87,7 @@ export function ResultsView({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-6 space-y-8 animate-fadeIn">
+    <div className="w-full max-w-4xl mx-auto px-4 py-6 pb-28 sm:pb-8 space-y-6 sm:space-y-8 animate-fadeIn">
       {/* Host Group Switcher (if host has multiple groups) */}
       {isHost && allGroups && allGroups.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
@@ -291,6 +291,29 @@ export function ResultsView({
           </ul>
         </div>
       )}
+
+      {/* Mobile Sticky Quick Share / Copy Bar */}
+      <div className="fixed sm:hidden bottom-0 left-0 right-0 p-3 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800/90 z-40 pb-safe shadow-2xl">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCopyLineup}
+            className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-sm active:scale-95 transition-all shadow-lg shadow-emerald-500/10 cursor-pointer touch-manipulation"
+          >
+            {copied ? (
+              <>
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>名單已複製！</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                <span>📋 複製本組名單與歌單</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
