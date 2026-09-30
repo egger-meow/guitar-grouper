@@ -7,7 +7,7 @@ import type {
   OptimizationResult,
   Role,
 } from '../types/domain';
-import { ROLES, PRESET_WEIGHTS, getTagNameZh } from '../engine/taxonomy';
+import { ROLES, PRESET_WEIGHTS, getTagNameZh, GENRES } from '../engine/taxonomy';
 import { QRCodeDisplay } from './QRCodeDisplay';
 import {
   Users,
@@ -28,6 +28,8 @@ import {
   KeyRound,
   ShieldCheck,
   Link as LinkIcon,
+  UserPlus,
+  X,
 } from 'lucide-react';
 import { calculateGroupCapacities } from '../engine/optimizer';
 
@@ -65,9 +67,57 @@ export function HostView({
   const [copiedHostLink, setCopiedHostLink] = useState(false);
   const [unlockInput, setUnlockInput] = useState('');
   const [customWeightsOpen, setCustomWeightsOpen] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addGender, setAddGender] = useState('unspecified');
+  const [addRoles, setAddRoles] = useState<Role[]>(['acoustic_guitar']);
+  const [addMusic, setAddMusic] = useState<string[]>(['any_genre']);
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
 
   const participantList = Object.values(participants);
   const canStart = participantCount >= 2;
+
+  const handleManualAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = addName.trim();
+    if (!cleanName) {
+      setManualError('請輸入姓名或暱稱');
+      return;
+    }
+    if (addRoles.length === 0) {
+      setManualError('請至少選擇一項樂器或角色');
+      return;
+    }
+    setManualError(null);
+    setIsSubmittingManual(true);
+    try {
+      const res = await fetch(`/api/room/${roomCode}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          participant: {
+            name: cleanName,
+            gender: addGender,
+            capabilities: addRoles,
+            musicPreferences: addMusic.length > 0 ? addMusic : ['any_genre'],
+            joinedAt: Date.now(),
+          },
+        }),
+      });
+      if (!res.ok) {
+        throw new Error('新增社員失敗，請確認網路連線');
+      }
+      setAddName('');
+      setAddRoles(['acoustic_guitar']);
+      setAddMusic(['any_genre']);
+      setShowAddModal(false);
+    } catch (err: any) {
+      setManualError(err.message || '新增社員失敗');
+    } finally {
+      setIsSubmittingManual(false);
+    }
+  };
 
   const handleCopyCode = async () => {
     try {
@@ -872,7 +922,17 @@ export function HostView({
                   現場成員動態牆 ({participantList.length} 人)
                 </h3>
               </div>
-              <span className="text-xs text-slate-400">實時同步</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(true)}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>手動新增社員</span>
+                </button>
+                <span className="text-xs text-slate-400 hidden sm:inline">實時同步</span>
+              </div>
             </div>
 
             {participantList.length === 0 ? (
@@ -1037,6 +1097,150 @@ export function HostView({
               <Play className="w-4 h-4 fill-current" />
               <span>開始分組</span>
             </button>
+          </div>
+        </div>
+      )}
+      {/* Manual Add Participant Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl space-y-5 my-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-white font-bold text-lg">手動代填 / 新增社員</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {manualError && (
+              <div className="p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-200 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                <span>{manualError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleManualAdd} className="space-y-4">
+              <div>
+                <label className="block text-slate-300 text-xs font-bold mb-1.5">
+                  社員暱稱 / 姓名 <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={addName}
+                  onChange={(e) => setAddName(e.target.value)}
+                  placeholder="例如：阿杰、小陳"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 text-xs font-bold mb-1.5">性別 / 分類</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'male', label: '男生' },
+                    { id: 'female', label: '女生' },
+                    { id: 'unspecified', label: '不透漏' },
+                  ].map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setAddGender(g.id)}
+                      className={`py-2 text-xs rounded-xl font-bold border transition-all cursor-pointer ${
+                        addGender === g.id
+                          ? 'bg-indigo-600 text-white border-indigo-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 text-xs font-bold mb-1.5">
+                  負責樂器 / 角色 (可多選) <span className="text-red-400">*</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                  {ROLES.filter((r) => r.id !== 'other').map((role) => {
+                    const isSelected = addRoles.includes(role.id);
+                    return (
+                      <button
+                        key={role.id}
+                        type="button"
+                        onClick={() => {
+                          setAddRoles((prev) =>
+                            isSelected ? prev.filter((r) => r !== role.id) : [...prev, role.id]
+                          );
+                        }}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
+                            : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{role.nameZh}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-indigo-400" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 text-xs font-bold mb-1.5">
+                  音樂偏好 (預設為都可以)
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {GENRES.slice(0, 5).map((genre) => {
+                    const isSelected = addMusic.includes(genre.id);
+                    return (
+                      <button
+                        key={genre.id}
+                        type="button"
+                        onClick={() => {
+                          setAddMusic((prev) =>
+                            isSelected ? prev.filter((m) => m !== genre.id) : [...prev, genre.id]
+                          );
+                        }}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-purple-600/30 border-purple-500 text-purple-200'
+                            : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{genre.nameZh}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingManual}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white font-bold text-xs shadow-lg transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingManual ? '新增中...' : '確認新增並加入動態牆'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -342,6 +342,49 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
         })
       );
     });
+
+    it('opens manual add participant modal and submits new member', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, participantId: 'new_p' }),
+      });
+      globalThis.fetch = mockFetch;
+
+      render(
+        <HostView
+          roomCode="ADDM"
+          hostSecret="secret123"
+          participantCount={2}
+          participants={mockParticipants}
+          settings={mockSettings}
+          status="WAITING"
+          onStartGrouping={vi.fn()}
+          onUpdateSettings={vi.fn()}
+        />
+      );
+
+      const addBtn = screen.getByRole('button', { name: /手動新增社員/i });
+      fireEvent.click(addBtn);
+
+      expect(screen.getByText(/手動代填 \/ 新增社員/i)).toBeTruthy();
+
+      // Enter name
+      const nameInput = screen.getByPlaceholderText(/阿杰、小陳/i);
+      fireEvent.change(nameInput, { target: { value: '阿銘' } });
+
+      // Click submit
+      const confirmBtn = screen.getByRole('button', { name: /確認新增並加入動態牆/i });
+      fireEvent.click(confirmBtn);
+
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/room/ADDM/join',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+    });
   });
 
   describe('3. Participant Form', () => {
