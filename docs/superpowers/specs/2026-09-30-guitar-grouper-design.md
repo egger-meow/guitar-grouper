@@ -97,7 +97,7 @@ export interface MusicItem {
 4. **西洋搖滾 / 另類 (`western_rock`)**
    - 知名代表：Oasis (`oasis`), Coldplay (`coldplay`), Queen (`queen`), Green Day (`green_day`), Radiohead (`radiohead`), Maroon 5 (`maroon_5`)
 5. **日語流行 / 動漫 / J-Rock (`jpop_anime_jrock`)**
-   - 知名代表：YOASOBI (`yoasobi`), Aimer (`aimer`), Eve (`eve`), Official髭男dism (`higedan`), ONE OK ROCK (`oor`), 結束バンド (`kessoku`)
+   - 知名代表：Yorushika (`yorushika`), YOASOBI (`yoasobi`), Aimer (`aimer`), Eve (`eve`), Official髭男dism (`higedan`), ONE OK ROCK (`oor`), 結束バンド (`kessoku`)
 6. **嘻哈 / 饒舌 / 放克 (`hiphop_funk`)**
    - 知名代表：蛋堡 (`softlipa`), 頑童MJ116 (`mj116`), 9m88 (`9m88`), 宇宙人 (`cosmospeople`), 落日飛車 (`sunset_rollercoaster`)
 
@@ -220,6 +220,17 @@ $$F(P) = w_{\text{role}} \cdot S_{\text{role}}(P) + w_{\text{music}} \cdot S_{\t
 2. 在結果頁面以親切小卡說明：
    > 💡 **小提醒**：本次共有 5 組，但全場僅有 2 位社員會木箱鼓，系統已將鼓手平均分配至第 1、第 3 組，其餘組別已強化吉他與主唱配置！
 3. 房主可一鍵「換個種子重新排組」或「微調條件重算」。
+
+### 6.3 成員端結果呈現 (Participant Result Experience)
+分組開獎後，每位參與成員的手機畫面清晰呈現：
+1. **所屬組別標題**：「你在 第 X 組！」
+2. **完整組員名單卡片**：
+   - 清楚列出同組每一位組員的暱稱與性別/分類。
+   - **樂器技能標籤**：展開該組員會的樂器角色（如「木吉他」、「主唱」、「木箱鼓」）。
+   - **音樂偏好標籤**：展開該組員喜歡的歌手與曲風（如「Yorushika」、「告五人」、「日語流行」）。
+3. **組內契合與推薦曲風**：
+   - 顯示本組最大公約數曲風與推薦嘗試歌曲，組員不用尷尬乾瞪眼，現場直接圍成一圈敲定第一次練團歌單！
+
 
 ---
 
