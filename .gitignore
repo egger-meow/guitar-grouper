@@ -1,5 +1,6 @@
 node_modules
 .wrangler
+.superpowers
 dist
 .env
 .env.local

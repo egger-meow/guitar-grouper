@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "guitar-grouper",
+  "main": "workers/app.ts",
+  "compatibility_date": "2026-09-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ROOM_DO",
+        "class_name": "RoomDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["RoomDO"]
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "guitar-grouper.jjmowlab.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "guitar-group.jjmowlab.com",
+      "custom_domain": true
+    }
+  ]
+}
