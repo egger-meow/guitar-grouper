@@ -17,6 +17,7 @@ import {
 interface RouteState {
   room: string;
   host: boolean;
+  secret?: string;
 }
 
 function parseUrlRoute(): RouteState {
@@ -24,7 +25,8 @@ function parseUrlRoute(): RouteState {
   const params = new URLSearchParams(window.location.search);
   const room = (params.get('room') || '').trim().toUpperCase();
   const host = params.get('host') === '1' || params.get('host') === 'true';
-  return { room, host };
+  const secret = (params.get('secret') || '').trim();
+  return { room, host, secret: secret || undefined };
 }
 
 export function App() {
@@ -46,11 +48,27 @@ export function App() {
     const params = new URLSearchParams();
     if (newRoute.room) params.set('room', newRoute.room);
     if (newRoute.host) params.set('host', '1');
+    if (newRoute.secret) params.set('secret', newRoute.secret);
     const newSearch = params.toString() ? `?${params.toString()}` : '/';
     window.history.pushState({}, '', newSearch);
     setRoute(newRoute);
     setGlobalError(null);
   };
+
+  const getStoredHostSecret = (code: string): string => {
+    if (typeof window === 'undefined' || !code) return '';
+    try {
+      return (
+        sessionStorage.getItem(`gg_host_secret_${code}`) ||
+        localStorage.getItem(`gg_host_secret_${code}`) ||
+        ''
+      );
+    } catch {
+      return '';
+    }
+  };
+
+  const effectiveHostSecret = route.secret || getStoredHostSecret(route.room);
 
   const {
     connected,
@@ -66,8 +84,10 @@ export function App() {
     joinRoom,
     updateSettings,
     startGrouping,
+    authenticateHost,
   } = useRoomSocket(route.room, {
     isHost: route.host,
+    hostSecret: effectiveHostSecret || undefined,
   });
 
   const handleCreateRoom = async () => {
@@ -79,7 +99,13 @@ export function App() {
         throw new Error('建立房間失敗，請稍後再試');
       }
       const data = (await res.json()) as { roomCode: string; hostSecret: string };
-      navigateTo({ room: data.roomCode, host: true });
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(`gg_host_secret_${data.roomCode}`, data.hostSecret);
+          localStorage.setItem(`gg_host_secret_${data.roomCode}`, data.hostSecret);
+        } catch {}
+      }
+      navigateTo({ room: data.roomCode, host: true, secret: data.hostSecret });
     } catch (err: any) {
       setGlobalError(err.message || '建立房間時發生錯誤');
     } finally {
@@ -246,7 +272,7 @@ export function App() {
         {route.room && route.host && (
           <HostView
             roomCode={route.room}
-            hostSecret={sessionStorage.getItem(`gg_host_secret_${route.room}`) || ''}
+            hostSecret={effectiveHostSecret}
             participantCount={participantCount}
             participants={participants}
             settings={settings}
@@ -255,6 +281,13 @@ export function App() {
             onStartGrouping={startGrouping}
             onUpdateSettings={updateSettings}
             onRerunGrouping={startGrouping}
+            onUnlockHost={(secret) => {
+              authenticateHost(secret);
+              navigateTo({ room: route.room, host: true, secret });
+            }}
+            onSwitchToParticipant={() => {
+              navigateTo({ room: route.room, host: false });
+            }}
           />
         )}
 

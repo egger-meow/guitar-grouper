@@ -163,6 +163,26 @@ export class RoomDO {
   }
 
   /**
+   * Broadcasts tailored ROOM_STATE to all connected WebSockets
+   */
+  public broadcastRoomState(): void {
+    if (!this.room) return;
+    const sockets = this.ctx.getWebSockets();
+    for (const ws of sockets) {
+      const att = this.getAttachment(ws);
+      try {
+        if (att.isHost) {
+          ws.send(JSON.stringify({ type: 'ROOM_STATE', ...this.getHostView() }));
+        } else if (att.participantId && this.room.participants[att.participantId]) {
+          ws.send(JSON.stringify({ type: 'ROOM_STATE', ...this.getParticipantView(att.participantId) }));
+        } else {
+          ws.send(JSON.stringify({ type: 'ROOM_STATE', ...this.getGeneralView() }));
+        }
+      } catch {}
+    }
+  }
+
+  /**
    * Broadcasts grouping result with personalized view for participants
    */
   public broadcastGroupingResult(): void {
@@ -398,7 +418,7 @@ export class RoomDO {
       if (body.settings) {
         this.room.settings = { ...this.room.settings, ...body.settings };
         await this.saveState();
-        this.broadcast({ type: 'ROOM_STATE', ...this.getGeneralView() });
+        this.broadcastRoomState();
       }
 
       return new Response(
@@ -550,9 +570,25 @@ export class RoomDO {
         break;
       }
 
+      case 'HOST_AUTH': {
+        if (data.hostSecret && data.hostSecret === this.room.hostSecret) {
+          this.setAttachment(ws, { ...att, isHost: true });
+          ws.send(JSON.stringify({ type: 'ROOM_STATE', ...this.getHostView() }));
+        } else {
+          ws.send(
+            JSON.stringify({
+              type: 'ERROR',
+              code: 'UNAUTHORIZED',
+              message: 'Invalid or missing host secret',
+            })
+          );
+        }
+        break;
+      }
+
       case 'HOST_UPDATE_SETTINGS': {
-        const isHost =
-          att.isHost || (data.hostSecret && data.hostSecret === this.room.hostSecret);
+        const secretValid = Boolean(data.hostSecret && data.hostSecret === this.room.hostSecret);
+        const isHost = att.isHost || secretValid;
 
         if (!isHost) {
           ws.send(
@@ -563,19 +599,23 @@ export class RoomDO {
             })
           );
           return;
+        }
+
+        if (secretValid && !att.isHost) {
+          this.setAttachment(ws, { ...att, isHost: true });
         }
 
         if (data.settings) {
           this.room.settings = { ...this.room.settings, ...data.settings };
           await this.saveState();
-          this.broadcast({ type: 'ROOM_STATE', ...this.getGeneralView() });
+          this.broadcastRoomState();
         }
         break;
       }
 
       case 'HOST_START_GROUPING': {
-        const isHost =
-          att.isHost || (data.hostSecret && data.hostSecret === this.room.hostSecret);
+        const secretValid = Boolean(data.hostSecret && data.hostSecret === this.room.hostSecret);
+        const isHost = att.isHost || secretValid;
 
         if (!isHost) {
           ws.send(
@@ -586,6 +626,10 @@ export class RoomDO {
             })
           );
           return;
+        }
+
+        if (secretValid && !att.isHost) {
+          this.setAttachment(ws, { ...att, isHost: true });
         }
 
         if (this.room.status !== 'WAITING') {

@@ -229,6 +229,56 @@ describe('Task 6: Cloudflare Durable Object Room Coordination & WebSocket Protoc
       const updatedData = (await goodHttpSettings.json()) as any;
       expect(updatedData.settings.targetGroupSize).toBe(3);
     });
+
+    it('authenticates unprivileged WebSocket connection using HOST_AUTH and receives host view', async () => {
+      // 1. Create Room
+      const createRes = await worker.fetch(
+        new Request('http://localhost/api/room/create', { method: 'POST' }),
+        env as any,
+        {} as any
+      );
+      const { roomCode, hostSecret } = (await createRes.json()) as any;
+
+      // 2. Connect unauthenticated WebSocket (no hostSecret in query string)
+      const wsReq = new Request(`http://localhost/api/room/${roomCode}/ws`, {
+        headers: { Upgrade: 'websocket' },
+      });
+      const wsRes = await worker.fetch(wsReq, env as any, {} as any);
+      const clientWs = (wsRes as any).webSocket;
+      await new Promise((r) => setTimeout(r, 10));
+      clientWs.receivedMessages = [];
+
+      // 3. Send HOST_AUTH with invalid secret -> receives UNAUTHORIZED
+      clientWs.send(JSON.stringify({ type: 'HOST_AUTH', hostSecret: 'wrong-secret' }));
+      await new Promise((r) => setTimeout(r, 20));
+      let msgs = clientWs.receivedMessages.map((m: string) => JSON.parse(m));
+      expect(msgs.some((m: any) => m.type === 'ERROR' && m.code === 'UNAUTHORIZED')).toBe(true);
+
+      // 4. Send HOST_AUTH with valid secret -> receives ROOM_STATE with host view
+      clientWs.receivedMessages = [];
+      clientWs.send(JSON.stringify({ type: 'HOST_AUTH', hostSecret }));
+      await new Promise((r) => setTimeout(r, 20));
+      msgs = clientWs.receivedMessages.map((m: string) => JSON.parse(m));
+      const hostStateMsg = msgs.find((m: any) => m.type === 'ROOM_STATE');
+      expect(hostStateMsg).toBeDefined();
+      expect(hostStateMsg.participants).toBeDefined();
+
+      // 5. Subsequent HOST_UPDATE_SETTINGS now succeeds because socket is authenticated
+      clientWs.send(
+        JSON.stringify({
+          type: 'HOST_UPDATE_SETTINGS',
+          settings: { targetGroupSize: 5 },
+        })
+      );
+      await new Promise((r) => setTimeout(r, 20));
+      const doEntry = env.ROOM_DO.getInstance(roomCode);
+      const stateReq = new Request('http://localhost/state', {
+        headers: { Authorization: `Bearer ${hostSecret}` },
+      });
+      const stateRes = await doEntry!.do.fetch(stateReq);
+      const state = (await stateRes.json()) as any;
+      expect(state.settings.targetGroupSize).toBe(5);
+    });
   });
 
   describe('4. Grouping Lifecycle', () => {

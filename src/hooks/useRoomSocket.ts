@@ -37,6 +37,7 @@ export interface UseRoomSocketReturn {
   updateSettings: (settings: Partial<HostSettings>) => Promise<void>;
   startGrouping: () => Promise<void>;
   refreshState: () => Promise<void>;
+  authenticateHost: (secret: string) => Promise<void>;
 }
 
 export function useRoomSocket(
@@ -45,17 +46,46 @@ export function useRoomSocket(
 ): UseRoomSocketReturn {
   const normalizedCode = roomCode ? roomCode.trim().toUpperCase() : '';
 
-  // Recover cached identity from sessionStorage
+  const getStoredSecret = useCallback((): string => {
+    if (typeof window === 'undefined' || !normalizedCode) return '';
+    try {
+      return (
+        sessionStorage.getItem(`gg_host_secret_${normalizedCode}`) ||
+        localStorage.getItem(`gg_host_secret_${normalizedCode}`) ||
+        ''
+      );
+    } catch {
+      return '';
+    }
+  }, [normalizedCode]);
+
+  // Recover cached identity from options, sessionStorage, or localStorage
   const [cachedHostSecret, setCachedHostSecret] = useState<string>(() => {
     if (options.hostSecret) return options.hostSecret;
-    if (typeof window === 'undefined') return '';
-    return sessionStorage.getItem(`gg_host_secret_${normalizedCode}`) || '';
+    if (typeof window === 'undefined' || !normalizedCode) return '';
+    try {
+      return (
+        sessionStorage.getItem(`gg_host_secret_${normalizedCode}`) ||
+        localStorage.getItem(`gg_host_secret_${normalizedCode}`) ||
+        ''
+      );
+    } catch {
+      return '';
+    }
   });
 
   const [cachedParticipantId, setCachedParticipantId] = useState<string>(() => {
     if (options.initialParticipantId) return options.initialParticipantId;
-    if (typeof window === 'undefined') return '';
-    return sessionStorage.getItem(`gg_participant_id_${normalizedCode}`) || '';
+    if (typeof window === 'undefined' || !normalizedCode) return '';
+    try {
+      return (
+        sessionStorage.getItem(`gg_participant_id_${normalizedCode}`) ||
+        localStorage.getItem(`gg_participant_id_${normalizedCode}`) ||
+        ''
+      );
+    } catch {
+      return '';
+    }
   });
 
   const [connected, setConnected] = useState(false);
@@ -65,9 +95,11 @@ export function useRoomSocket(
   const [settings, setSettings] = useState<HostSettings>(DEFAULT_HOST_SETTINGS);
   const [participants, setParticipants] = useState<Record<string, Participant>>({});
   const [participant, setParticipant] = useState<Participant | null>(() => {
-    if (typeof window === 'undefined') return null;
+    if (typeof window === 'undefined' || !normalizedCode) return null;
     try {
-      const raw = sessionStorage.getItem(`gg_participant_${normalizedCode}`);
+      const raw =
+        sessionStorage.getItem(`gg_participant_${normalizedCode}`) ||
+        localStorage.getItem(`gg_participant_${normalizedCode}`);
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -82,25 +114,33 @@ export function useRoomSocket(
   const reconnectTimeoutRef = useRef<any>(null);
   const pingIntervalRef = useRef<any>(null);
 
-  // Sync hostSecret into sessionStorage if provided in options
+  // Sync hostSecret into storage if provided in options
   useEffect(() => {
     if (options.hostSecret && normalizedCode) {
-      sessionStorage.setItem(`gg_host_secret_${normalizedCode}`, options.hostSecret);
+      try {
+        sessionStorage.setItem(`gg_host_secret_${normalizedCode}`, options.hostSecret);
+        localStorage.setItem(`gg_host_secret_${normalizedCode}`, options.hostSecret);
+      } catch {}
       setCachedHostSecret(options.hostSecret);
     }
   }, [options.hostSecret, normalizedCode]);
+
+  const getEffectiveSecret = useCallback((): string => {
+    return cachedHostSecret || options.hostSecret || getStoredSecret();
+  }, [cachedHostSecret, options.hostSecret, getStoredSecret]);
 
   // HTTP State Polling / Fallback
   const refreshState = useCallback(async () => {
     if (!normalizedCode) return;
     try {
+      const secret = getEffectiveSecret();
       const params = new URLSearchParams();
       if (cachedParticipantId) params.set('participantId', cachedParticipantId);
-      if (cachedHostSecret) params.set('hostSecret', cachedHostSecret);
+      if (secret) params.set('hostSecret', secret);
 
       const headers: Record<string, string> = {};
-      if (cachedHostSecret) {
-        headers['Authorization'] = `Bearer ${cachedHostSecret}`;
+      if (secret) {
+        headers['Authorization'] = `Bearer ${secret}`;
       }
 
       const res = await fetch(`/api/room/${normalizedCode}/state?${params.toString()}`, {
@@ -129,7 +169,7 @@ export function useRoomSocket(
     } catch (e: any) {
       console.warn('refreshState fallback failed:', e);
     }
-  }, [normalizedCode, cachedParticipantId, cachedHostSecret]);
+  }, [normalizedCode, cachedParticipantId, getEffectiveSecret]);
 
   // WebSocket Connection Logic
   const connectWs = useCallback(() => {
@@ -143,9 +183,10 @@ export function useRoomSocket(
     setConnecting(true);
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
+    const secret = getEffectiveSecret();
     const params = new URLSearchParams();
     if (cachedParticipantId) params.set('participantId', cachedParticipantId);
-    if (cachedHostSecret) params.set('hostSecret', cachedHostSecret);
+    if (secret) params.set('hostSecret', secret);
 
     const wsUrl = `${protocol}//${host}/api/room/${normalizedCode}/ws?${params.toString()}`;
 
@@ -258,7 +299,7 @@ export function useRoomSocket(
       setConnected(false);
       setConnecting(false);
     }
-  }, [normalizedCode, cachedParticipantId, cachedHostSecret]);
+  }, [normalizedCode, cachedParticipantId, getEffectiveSecret]);
 
   useEffect(() => {
     if (!normalizedCode) return;
@@ -273,6 +314,33 @@ export function useRoomSocket(
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     };
   }, [normalizedCode, refreshState, connectWs]);
+
+  // Authenticate Host Action
+  const authenticateHost = useCallback(
+    async (secret: string) => {
+      const cleanSecret = secret.trim();
+      if (!cleanSecret || !normalizedCode) return;
+      try {
+        sessionStorage.setItem(`gg_host_secret_${normalizedCode}`, cleanSecret);
+        localStorage.setItem(`gg_host_secret_${normalizedCode}`, cleanSecret);
+      } catch {}
+      setCachedHostSecret(cleanSecret);
+      setError(null);
+
+      // Send auth over WebSocket if open
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'HOST_AUTH',
+            hostSecret: cleanSecret,
+          })
+        );
+      } else {
+        refreshState();
+      }
+    },
+    [normalizedCode, refreshState]
+  );
 
   // Join Room Action
   const joinRoom = useCallback(
@@ -330,7 +398,11 @@ export function useRoomSocket(
   const updateSettings = useCallback(
     async (newSettings: Partial<HostSettings>) => {
       if (!normalizedCode) return;
-      const secret = cachedHostSecret;
+      const secret = getEffectiveSecret();
+      if (!secret && options.isHost) {
+        setError('尚未提供主辦人密鑰，無法修改房間設定');
+        return;
+      }
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
@@ -351,14 +423,18 @@ export function useRoomSocket(
       }
       setSettings((prev) => ({ ...prev, ...newSettings }));
     },
-    [normalizedCode, cachedHostSecret]
+    [normalizedCode, getEffectiveSecret, options.isHost]
   );
 
   // Start Grouping Action (Host)
   const startGrouping = useCallback(async () => {
     if (!normalizedCode) return;
+    const secret = getEffectiveSecret();
+    if (!secret && options.isHost) {
+      setError('尚未提供主辦人密鑰，無法開始分組');
+      return;
+    }
     setStatus('OPTIMIZING');
-    const secret = cachedHostSecret;
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(
         JSON.stringify({
@@ -381,7 +457,7 @@ export function useRoomSocket(
         setStatus('REVEALED');
       }
     }
-  }, [normalizedCode, cachedHostSecret]);
+  }, [normalizedCode, getEffectiveSecret, options.isHost]);
 
   return {
     connected,
@@ -400,5 +476,6 @@ export function useRoomSocket(
     updateSettings,
     startGrouping,
     refreshState,
+    authenticateHost,
   };
 }

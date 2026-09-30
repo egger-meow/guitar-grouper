@@ -36,6 +36,28 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       expect(screen.getByPlaceholderText(/請輸入 4 位英文房間代碼/i)).toBeTruthy();
       expect(screen.getByRole('button', { name: /進入房間/i })).toBeTruthy();
     });
+
+    it('creates room via API and stores hostSecret into session and local storage', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ roomCode: 'TEST', hostSecret: 'secret_abc_123' }),
+      });
+      globalThis.fetch = mockFetch;
+
+      render(<App />);
+
+      const createBtn = screen.getByRole('button', { name: /建立分組房間/i });
+      fireEvent.click(createBtn);
+
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/room/create', { method: 'POST' });
+      expect(sessionStorage.getItem('gg_host_secret_TEST')).toBe('secret_abc_123');
+      expect(localStorage.getItem('gg_host_secret_TEST')).toBe('secret_abc_123');
+      expect(window.location.search).toContain('room=TEST');
+      expect(window.location.search).toContain('host=1');
+      expect(window.location.search).toContain('secret=secret_abc_123');
+    });
   });
 
   describe('2. Host Screen', () => {
@@ -127,6 +149,60 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       const startBtns = screen.getAllByRole('button', { name: /開始分組/i });
       expect(startBtns[0].hasAttribute('disabled')).toBe(true);
       expect(screen.getByText(/至少需要 2 位成員/i)).toBeTruthy();
+    });
+
+    it('renders unlock prompt when hostSecret is missing, and unlocks on submit', () => {
+      const onUnlockHost = vi.fn();
+      const onSwitchToParticipant = vi.fn();
+
+      render(
+        <HostView
+          roomCode="PASS"
+          hostSecret=""
+          participantCount={0}
+          participants={{}}
+          settings={mockSettings}
+          status="WAITING"
+          onStartGrouping={vi.fn()}
+          onUpdateSettings={vi.fn()}
+          onUnlockHost={onUnlockHost}
+          onSwitchToParticipant={onSwitchToParticipant}
+        />
+      );
+
+      // Verify unlock prompt
+      expect(screen.getByText(/主辦人身份驗證/i)).toBeTruthy();
+      const secretInput = screen.getByPlaceholderText(/請輸入主辦人密鑰/i);
+      expect(secretInput).toBeTruthy();
+
+      fireEvent.change(secretInput, { target: { value: 'my_secret_token' } });
+      const unlockBtn = screen.getByRole('button', { name: /解鎖主辦人控制台/i });
+      fireEvent.click(unlockBtn);
+
+      expect(onUnlockHost).toHaveBeenCalledWith('my_secret_token');
+
+      // Verify switch to participant button
+      const switchBtn = screen.getByText(/切換至社員填寫頁面/i);
+      fireEvent.click(switchBtn);
+      expect(onSwitchToParticipant).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders copy host link button and verified badge when hostSecret is provided', () => {
+      render(
+        <HostView
+          roomCode="PASS"
+          hostSecret="valid_secret_xyz"
+          participantCount={2}
+          participants={mockParticipants}
+          settings={mockSettings}
+          status="WAITING"
+          onStartGrouping={vi.fn()}
+          onUpdateSettings={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText(/已授權/i)).toBeTruthy();
+      expect(screen.getByRole('button', { name: /複製主辦連結/i })).toBeTruthy();
     });
   });
 

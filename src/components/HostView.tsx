@@ -24,6 +24,10 @@ import {
   Award,
   ChevronRight,
   Disc,
+  Lock,
+  KeyRound,
+  ShieldCheck,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 export interface HostViewProps {
@@ -37,11 +41,13 @@ export interface HostViewProps {
   onStartGrouping: () => void;
   onUpdateSettings: (settings: Partial<HostSettings>) => void;
   onRerunGrouping?: () => void;
+  onUnlockHost?: (secret: string) => void;
+  onSwitchToParticipant?: () => void;
 }
 
 export function HostView({
   roomCode,
-  hostSecret: _hostSecret,
+  hostSecret,
   participantCount,
   participants,
   settings,
@@ -50,9 +56,13 @@ export function HostView({
   onStartGrouping,
   onUpdateSettings,
   onRerunGrouping,
+  onUnlockHost,
+  onSwitchToParticipant,
 }: HostViewProps) {
   const [showQR, setShowQR] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedHostLink, setCopiedHostLink] = useState(false);
+  const [unlockInput, setUnlockInput] = useState('');
   const [customWeightsOpen, setCustomWeightsOpen] = useState(false);
 
   const participantList = Object.values(participants);
@@ -112,15 +122,93 @@ export function HostView({
     });
   });
 
+  const handleCopyHostLink = async () => {
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://guitar-grouper.jjmowlab.com';
+      const url = `${origin}/?room=${roomCode}&host=1&secret=${hostSecret}`;
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+      setCopiedHostLink(true);
+      setTimeout(() => setCopiedHostLink(false), 2000);
+    } catch {
+      setCopiedHostLink(true);
+      setTimeout(() => setCopiedHostLink(false), 2000);
+    }
+  };
+
+  // If hostSecret is missing, show friendly unlock screen
+  if (!hostSecret) {
+    return (
+      <div className="w-full max-w-lg mx-auto py-12 px-4 text-center space-y-6 animate-fadeIn">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto shadow-inner">
+            <KeyRound className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl sm:text-2xl font-black text-white">
+              主辦人身份驗證
+            </h2>
+            <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+              您正在存取房間 <span className="font-mono font-bold text-amber-400">{roomCode}</span> 的主辦人控制台。此裝置尚未存有主辦人密鑰，請輸入建立房間時取得的密鑰以解鎖。
+            </p>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const clean = unlockInput.trim();
+              if (clean && onUnlockHost) {
+                onUnlockHost(clean);
+              }
+            }}
+            className="space-y-4"
+          >
+            <input
+              type="text"
+              value={unlockInput}
+              onChange={(e) => setUnlockInput(e.target.value)}
+              placeholder="請輸入主辦人密鑰 (Host Secret)"
+              className="w-full px-4 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-white font-mono text-center text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 uppercase"
+            />
+            <button
+              type="submit"
+              disabled={!unlockInput.trim()}
+              className="w-full py-3.5 px-6 rounded-2xl bg-amber-400 hover:bg-amber-300 disabled:opacity-50 text-slate-950 font-black text-sm shadow-lg shadow-amber-400/20 active:scale-95 transition-all cursor-pointer"
+            >
+              解鎖主辦人控制台
+            </button>
+          </form>
+          {onSwitchToParticipant && (
+            <div className="pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={onSwitchToParticipant}
+                className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+              >
+                我是社員，切換至社員填寫頁面
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-6 pb-28 sm:pb-8 space-y-6 sm:space-y-8 animate-fadeIn">
       {/* Top Banner: Big Kahoot-Style Room Code */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 via-slate-900 to-purple-950 border border-indigo-700/40 p-6 md:p-8 shadow-2xl">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-center md:text-left space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold tracking-wider uppercase border border-indigo-400/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              主辦人控制台 (Host Room)
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold tracking-wider uppercase border border-indigo-400/20">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                主辦人控制台 (Host Room)
+              </div>
+              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/30">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>已授權</span>
+              </div>
             </div>
             <h2 className="text-slate-400 text-sm font-medium">房間邀請代碼</h2>
             <div className="flex items-center gap-4 justify-center md:justify-start">
@@ -143,6 +231,25 @@ export function HostView({
           </div>
 
           <div className="flex flex-wrap items-center gap-3 justify-center">
+            <button
+              type="button"
+              onClick={handleCopyHostLink}
+              className="flex items-center gap-1.5 px-4 py-3 rounded-2xl font-bold text-xs sm:text-sm bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 active:scale-95 transition-all cursor-pointer"
+              title="複製包含密鑰的主辦人管理網址，可用於投影機或電腦直接登入"
+            >
+              {copiedHostLink ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span>已複製管理連結！</span>
+                </>
+              ) : (
+                <>
+                  <LinkIcon className="w-4 h-4 text-indigo-400" />
+                  <span>複製主辦連結</span>
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => setShowQR(!showQR)}
