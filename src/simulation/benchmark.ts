@@ -6,6 +6,7 @@ import type {
 } from '../types/domain';
 import { scorePartition } from '../engine/scoring';
 import { optimizeGrouping } from '../engine/optimizer';
+import { DEFAULT_HOST_SETTINGS } from '../engine/taxonomy';
 import { generateSyntheticRoom, ScenarioType } from './generator';
 import { runRandomBaseline, runNaiveGreedyBaseline } from './baselines';
 
@@ -40,15 +41,7 @@ export interface BenchmarkComparisonResult {
   };
 }
 
-export const DEFAULT_BENCHMARK_SETTINGS: HostSettings = {
-  targetGroupSize: 4,
-  preset: 'balanced',
-  weights: { role: 0.45, music: 0.4, diversity: 0.15 },
-  genreGranularity: 'fine',
-  desiredRoles: ['acoustic_guitar', 'electric_guitar', 'cajon', 'drums', 'lead_vocal'],
-  minRequiredRolesCount: 1,
-  keyRoles: ['acoustic_guitar', 'electric_guitar', 'cajon', 'lead_vocal'],
-};
+export const DEFAULT_BENCHMARK_SETTINGS: HostSettings = DEFAULT_HOST_SETTINGS;
 
 /**
  * Calculates scarce role dispersion:

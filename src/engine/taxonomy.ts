@@ -1,4 +1,4 @@
-import type { Role, RoleDefinition, MusicItem } from '../types/domain';
+import type { Role, RoleDefinition, MusicItem, HostSettings } from '../types/domain';
 
 /**
  * Real university guitar club instrument and vocal roles
@@ -218,3 +218,20 @@ export function getTagNameZh(id: string): string {
   }
   return id;
 }
+
+/**
+ * Verified default host settings for guitar group optimization
+ */
+export const DEFAULT_HOST_SETTINGS: HostSettings = {
+  targetGroupSize: 4,
+  preset: 'balanced',
+  weights: {
+    role: 0.45,
+    music: 0.4,
+    diversity: 0.15,
+  },
+  genreGranularity: 'fine',
+  desiredRoles: ['acoustic_guitar', 'electric_guitar', 'cajon', 'drums', 'lead_vocal'],
+  minRequiredRolesCount: 1,
+  keyRoles: ['acoustic_guitar', 'electric_guitar', 'cajon', 'lead_vocal'],
+};
