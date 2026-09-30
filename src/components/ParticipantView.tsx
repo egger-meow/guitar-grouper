@@ -9,6 +9,7 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
+  Users,
 } from 'lucide-react';
 
 export interface ParticipantViewProps {
@@ -16,6 +17,7 @@ export interface ParticipantViewProps {
   participant: Participant | null;
   status: 'WAITING' | 'OPTIMIZING' | 'REVEALED';
   settings?: HostSettings;
+  participantCount?: number;
   onSubmit: (data: {
     name: string;
     gender: string;
@@ -29,6 +31,7 @@ export function ParticipantView({
   participant,
   status,
   settings,
+  participantCount,
   onSubmit,
 }: ParticipantViewProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -89,14 +92,24 @@ export function ParticipantView({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              房間：<strong className="text-amber-400 font-mono tracking-widest">{roomCode}</strong>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                房間：<strong className="text-amber-400 font-mono tracking-widest">{roomCode}</strong>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-xs font-semibold text-emerald-300 shadow-sm shadow-emerald-500/10">
+                <Users className="w-3.5 h-3.5 text-emerald-400" />
+                <span>
+                  目前已加入 <strong className="text-white font-bold">{participantCount ?? 1}</strong> 人
+                </span>
+              </div>
             </div>
             <h2 className="text-2xl font-black text-white">等待主辦人開始分組...</h2>
             <p className="text-slate-400 text-sm">
-              你已經成功報名！請稍待其他學員加入，主辦人即將啟動 AI 演算法分配樂團。
+              你已經成功報名！目前全場共{' '}
+              <strong className="text-emerald-400 font-bold">{participantCount ?? 1}</strong>{' '}
+              位社員在線等候，主辦人即將啟動 AI 演算法分配樂團。
             </p>
           </div>
 
@@ -193,7 +206,16 @@ export function ParticipantView({
             <span className="text-xs font-bold text-amber-400 uppercase tracking-widest">
               30 秒快速填寫
             </span>
-            <span className="text-xs text-slate-400 font-mono">房間: {roomCode}</span>
+            <div className="flex items-center gap-2">
+              {typeof participantCount === 'number' && participantCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-[11px] flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <Users className="w-3 h-3 text-emerald-400" />
+                  <span>{participantCount} 人在線</span>
+                </span>
+              )}
+              <span className="text-xs text-slate-400 font-mono">房間: {roomCode}</span>
+            </div>
           </div>
           <h2 className="text-2xl font-black text-white">加入吉他社分組</h2>
           <p className="text-slate-400 text-xs mt-1">

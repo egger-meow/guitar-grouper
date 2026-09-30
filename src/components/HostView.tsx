@@ -83,10 +83,65 @@ export function HostView({
   };
 
   const handlePresetSelect = (preset: PresetType) => {
-    const weights = PRESET_WEIGHTS[preset] || PRESET_WEIGHTS.balanced;
+    const weights =
+      preset === 'custom'
+        ? settings.weights || PRESET_WEIGHTS.custom
+        : PRESET_WEIGHTS[preset] || PRESET_WEIGHTS.balanced;
     onUpdateSettings({
       preset,
       weights,
+    });
+    if (preset === 'custom') {
+      setCustomWeightsOpen(true);
+    }
+  };
+
+  const handleWeightChange = (field: 'role' | 'music' | 'diversity', val: number) => {
+    const currentWeights = settings.weights || { role: 0.45, music: 0.4, diversity: 0.15 };
+    onUpdateSettings({
+      preset: 'custom',
+      weights: {
+        ...currentWeights,
+        [field]: Math.max(0, Math.min(100, val)) / 100,
+      },
+    });
+  };
+
+  const handleNormalizeWeights = () => {
+    const r = settings.weights?.role ?? 0.45;
+    const m = settings.weights?.music ?? 0.4;
+    const d = settings.weights?.diversity ?? 0.15;
+    const sum = r + m + d || 1;
+    const normR = Math.round((r / sum) * 100) / 100;
+    const normM = Math.round((m / sum) * 100) / 100;
+    const normD = Math.max(0, Math.round((1 - normR - normM) * 100) / 100);
+    onUpdateSettings({
+      preset: 'custom',
+      weights: {
+        role: normR,
+        music: normM,
+        diversity: normD,
+      },
+    });
+  };
+
+  const handleToggleDesiredRole = (roleId: Role) => {
+    const current: Role[] =
+      settings.desiredRoles && settings.desiredRoles.length > 0
+        ? settings.desiredRoles
+        : (['acoustic_guitar', 'electric_guitar', 'cajon', 'drums', 'lead_vocal'] as Role[]);
+    const exists = current.includes(roleId);
+    const next: Role[] = exists ? current.filter((id) => id !== roleId) : [...current, roleId];
+    onUpdateSettings({
+      preset: 'custom',
+      desiredRoles: next,
+    });
+  };
+
+  const handleMinRequiredRolesChange = (count: number) => {
+    onUpdateSettings({
+      preset: 'custom',
+      minRequiredRolesCount: count,
     });
   };
 
@@ -493,7 +548,7 @@ export function HostView({
                   type="button"
                   onClick={() => {
                     handlePresetSelect('custom');
-                    setCustomWeightsOpen(!customWeightsOpen);
+                    setCustomWeightsOpen((prev) => (settings.preset === 'custom' ? !prev : true));
                   }}
                   className={`flex items-center justify-between p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                     settings.preset === 'custom'
@@ -511,6 +566,205 @@ export function HostView({
                   {settings.preset === 'custom' && <Check className="w-4 h-4 text-amber-400" />}
                 </button>
               </div>
+
+              {/* Custom Configuration Panel when custom is active */}
+              {(settings.preset === 'custom' || customWeightsOpen) && (
+                <div
+                  data-testid="custom-weights-panel"
+                  className="p-4 sm:p-5 rounded-2xl bg-amber-950/20 border border-amber-500/40 space-y-5 animate-fadeIn"
+                >
+                  <div className="flex items-center justify-between pb-3 border-b border-amber-500/20">
+                    <div className="flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-amber-400" />
+                      <span className="font-bold text-sm text-amber-200">
+                        自訂演算法權重與目標角色
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-medium">
+                      客製化模式
+                    </span>
+                  </div>
+
+                  {/* Weights Sliders */}
+                  <div className="space-y-4">
+                    {/* Role Weight Slider */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-blue-300 flex items-center gap-1.5">
+                          <span>🎸</span> 樂器配置與角色完整度
+                        </span>
+                        <span className="font-mono font-bold text-blue-400 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-800">
+                          {Math.round((settings.weights?.role ?? 0.45) * 100)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        aria-label="樂器配置權重"
+                        value={Math.round((settings.weights?.role ?? 0.45) * 100)}
+                        onChange={(e) => handleWeightChange('role', Number(e.target.value))}
+                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                      />
+                      <div className="text-[11px] text-slate-400">
+                        重視主唱、吉他、木箱鼓等編制齊全度與稀缺角色分散。
+                      </div>
+                    </div>
+
+                    {/* Music Weight Slider */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-purple-300 flex items-center gap-1.5">
+                          <span>🎵</span> 曲風品味契合度
+                        </span>
+                        <span className="font-mono font-bold text-purple-400 bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800">
+                          {Math.round((settings.weights?.music ?? 0.4) * 100)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        aria-label="曲風品味權重"
+                        value={Math.round((settings.weights?.music ?? 0.4) * 100)}
+                        onChange={(e) => handleWeightChange('music', Number(e.target.value))}
+                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                      />
+                      <div className="text-[11px] text-slate-400">
+                        重視組員間喜愛之曲風與歌手契合度，創造最大音樂共鳴。
+                      </div>
+                    </div>
+
+                    {/* Diversity Weight Slider */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-emerald-300 flex items-center gap-1.5">
+                          <span>👥</span> 性別多元平衡
+                        </span>
+                        <span className="font-mono font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
+                          {Math.round((settings.weights?.diversity ?? 0.15) * 100)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        aria-label="性別多元權重"
+                        value={Math.round((settings.weights?.diversity ?? 0.15) * 100)}
+                        onChange={(e) => handleWeightChange('diversity', Number(e.target.value))}
+                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                      />
+                      <div className="text-[11px] text-slate-400">
+                        維持各組男女比例平衡，促進跨群體交流與破冰體驗。
+                      </div>
+                    </div>
+
+                    {/* Total Weight Summary & Quick Reset */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400">權重合計:</span>
+                        <span
+                          className={`font-mono font-bold px-2 py-0.5 rounded ${
+                            Math.round(
+                              ((settings.weights?.role ?? 0.45) +
+                                (settings.weights?.music ?? 0.4) +
+                                (settings.weights?.diversity ?? 0.15)) *
+                                100
+                            ) === 100
+                              ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-700/50'
+                              : 'bg-amber-900/50 text-amber-300 border border-amber-700/50'
+                          }`}
+                        >
+                          {Math.round(
+                            ((settings.weights?.role ?? 0.45) +
+                              (settings.weights?.music ?? 0.4) +
+                              (settings.weights?.diversity ?? 0.15)) *
+                              100
+                          )}
+                          %
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={handleNormalizeWeights}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-medium transition-colors cursor-pointer"
+                        >
+                          ⚡ 歸一化至 100%
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desired Roles Selection */}
+                  <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-300 block">
+                        每組目標樂器配置 (點擊多選)
+                      </label>
+                      <span className="text-[11px] text-slate-500">
+                        已選 {(settings.desiredRoles || []).length} 種
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ROLES.filter((r) => r.id !== 'other').map((role) => {
+                        const isSelected = (settings.desiredRoles || []).includes(role.id);
+                        return (
+                          <button
+                            key={role.id}
+                            type="button"
+                            onClick={() => handleToggleDesiredRole(role.id)}
+                            className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-amber-500/20 border-amber-500/60 text-amber-200 shadow-sm'
+                                : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-300 hover:bg-slate-800'
+                            }`}
+                          >
+                            <span>{role.nameZh}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      演算法將重點評估各組對所選樂器職責的涵蓋度，分散關鍵樂手。
+                    </p>
+                  </div>
+
+                  {/* Min Required Roles Count */}
+                  <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      每組最少滿足目標角色數
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[1, 2, 3, 4].map((count) => {
+                        const isSelected = (settings.minRequiredRolesCount ?? 1) === count;
+                        return (
+                          <button
+                            key={count}
+                            type="button"
+                            onClick={() => handleMinRequiredRolesChange(count)}
+                            className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-600 text-white border-amber-400 shadow-md ring-2 ring-amber-400/20'
+                                : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                            }`}
+                          >
+                            至少 {count} 項
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      若小組滿足上述目標角色的數量低於此門檻，演算法將啟動缺漏懲罰機制。
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Genre Granularity */}

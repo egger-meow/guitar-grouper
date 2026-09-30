@@ -307,6 +307,7 @@ export function App() {
             participant={participant}
             status={status}
             settings={settings}
+            participantCount={participantCount}
             onSubmit={joinRoom}
           />
         )}

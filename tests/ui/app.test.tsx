@@ -263,6 +263,85 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       expect(screen.getByText(/目前/i)).toBeTruthy();
       expect(screen.getByText(/預計分成/i)).toBeTruthy();
     });
+
+    it('renders and interacts with custom weights and role requirements panel', () => {
+      const onUpdateSettings = vi.fn();
+
+      render(
+        <HostView
+          roomCode="CUST"
+          hostSecret="secret123"
+          participantCount={8}
+          participants={mockParticipants}
+          settings={{
+            ...mockSettings,
+            preset: 'custom',
+            weights: { role: 0.5, music: 0.3, diversity: 0.2 },
+            desiredRoles: ['acoustic_guitar', 'lead_vocal'],
+            minRequiredRolesCount: 1,
+          }}
+          status="WAITING"
+          onStartGrouping={vi.fn()}
+          onUpdateSettings={onUpdateSettings}
+        />
+      );
+
+      // Verify custom configuration panel is rendered
+      expect(screen.getByTestId('custom-weights-panel')).toBeTruthy();
+      expect(screen.getByText(/自訂演算法權重與目標角色/i)).toBeTruthy();
+
+      // Sliders exist with accessible labels
+      const roleSlider = screen.getByLabelText(/樂器配置權重/i) as HTMLInputElement;
+      const musicSlider = screen.getByLabelText(/曲風品味權重/i) as HTMLInputElement;
+      const diversitySlider = screen.getByLabelText(/性別多元權重/i) as HTMLInputElement;
+
+      expect(roleSlider.value).toBe('50');
+      expect(musicSlider.value).toBe('30');
+      expect(diversitySlider.value).toBe('20');
+
+      // Adjust role slider
+      fireEvent.change(roleSlider, { target: { value: '60' } });
+      expect(onUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preset: 'custom',
+          weights: expect.objectContaining({ role: 0.6 }),
+        })
+      );
+
+      // Toggle desired role (e.g. 貝斯)
+      const bassBtn = screen.getByRole('button', { name: /貝斯/i });
+      fireEvent.click(bassBtn);
+      expect(onUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preset: 'custom',
+          desiredRoles: expect.arrayContaining(['acoustic_guitar', 'lead_vocal', 'bass']),
+        })
+      );
+
+      // Change minimum required roles to 2
+      const min2Btn = screen.getByRole('button', { name: /至少 2 項/i });
+      fireEvent.click(min2Btn);
+      expect(onUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preset: 'custom',
+          minRequiredRolesCount: 2,
+        })
+      );
+
+      // Normalize weights
+      const normalizeBtn = screen.getByRole('button', { name: /歸一化至 100%/i });
+      fireEvent.click(normalizeBtn);
+      expect(onUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preset: 'custom',
+          weights: expect.objectContaining({
+            role: expect.any(Number),
+            music: expect.any(Number),
+            diversity: expect.any(Number),
+          }),
+        })
+      );
+    });
   });
 
   describe('3. Participant Form', () => {
@@ -358,7 +437,7 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       );
     });
 
-    it('shows animated rhythm pulse waiting screen when already joined', () => {
+    it('shows animated rhythm pulse waiting screen with real-time participant counter when already joined', () => {
       const joinedUser: Participant = {
         id: 'p99',
         name: '安安',
@@ -372,6 +451,7 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
         <ParticipantView
           roomCode="BAND"
           participant={joinedUser}
+          participantCount={15}
           status="WAITING"
           onSubmit={vi.fn()}
         />
@@ -380,6 +460,24 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       expect(screen.getByText(/等待主辦人開始分組/i)).toBeTruthy();
       expect(screen.getByText('安安')).toBeTruthy();
       expect(screen.getByText(/鍵盤/i)).toBeTruthy();
+
+      // Real-time counter badge
+      expect(screen.getByText(/目前已加入/i)).toBeTruthy();
+      expect(screen.getAllByText('15').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('shows real-time online counter in the registration form header', () => {
+      render(
+        <ParticipantView
+          roomCode="BAND"
+          participant={null}
+          participantCount={7}
+          status="WAITING"
+          onSubmit={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText(/7 人在線/i)).toBeTruthy();
     });
   });
 
