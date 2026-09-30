@@ -306,6 +306,7 @@ export function App() {
             roomCode={route.room}
             participant={participant}
             status={status}
+            settings={settings}
             onSubmit={joinRoom}
           />
         )}

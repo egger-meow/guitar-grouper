@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
-import type { Participant, Role } from '../types/domain';
+import type { Participant, Role, HostSettings } from '../types/domain';
 import { ROLES, GENRES, ARTISTS, getTagNameZh } from '../engine/taxonomy';
 import {
-  Music,
   Check,
   Sparkles,
   Guitar,
-  Mic,
-  Volume2,
   Edit3,
-  Users,
   Search,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 export interface ParticipantViewProps {
   roomCode: string;
   participant: Participant | null;
   status: 'WAITING' | 'OPTIMIZING' | 'REVEALED';
+  settings?: HostSettings;
   onSubmit: (data: {
     name: string;
     gender: string;
@@ -29,6 +28,7 @@ export function ParticipantView({
   roomCode,
   participant,
   status,
+  settings,
   onSubmit,
 }: ParticipantViewProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -38,7 +38,10 @@ export function ParticipantView({
   const [selectedMusic, setSelectedMusic] = useState<string[]>(participant?.musicPreferences || []);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showFullArtistLibrary, setShowFullArtistLibrary] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  const isCoarse = settings?.genreGranularity === 'coarse';
 
   const toggleRole = (roleId: Role) => {
     setSelectedRoles((prev) =>
@@ -150,7 +153,7 @@ export function ParticipantView({
     );
   }
 
-  // 30-Second Mobile Form
+  // Filtered artists based on category & search query
   const filteredArtists = ARTISTS.filter((item) => {
     const matchesCategory =
       activeCategory === 'all' || item.parentId === activeCategory;
@@ -160,6 +163,24 @@ export function ParticipantView({
       (item.subtext && item.subtext.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
+
+  const hasAnyGenreSelected = selectedMusic.includes('any_genre');
+
+  // Category filter list for artists
+  const artistCategoryFilters = [
+    { id: 'all', label: '全部歌手' },
+    { id: 'indie_rock', label: '台灣獨立' },
+    { id: 'mandopop_ballad', label: '華語流行' },
+    { id: 'campus_folk_acoustic', label: '校園民謠' },
+    { id: 'western_rock', label: '西洋搖滾' },
+    { id: 'western_pop_rnb', label: '西洋流行' },
+    { id: 'jpop_anime_jrock', label: '日語動漫' },
+    { id: 'kpop_kindie', label: '韓系獨立' },
+    { id: 'hiphop_funk', label: 'CityPop/黑樂' },
+    { id: 'cn_pop_indie', label: '中國民謠' },
+    { id: 'douyin_viral', label: '抖音熱門' },
+    { id: 'heavy_metal_math', label: '重型數搖' },
+  ];
 
   return (
     <div className="w-full max-w-xl mx-auto px-4 py-6 animate-fadeIn">
@@ -270,84 +291,207 @@ export function ParticipantView({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="block text-slate-300 text-sm font-bold">
-              音樂品味與熱門歌手 (可複選)
+              音樂品味與喜愛流派 (可複選)
             </label>
             <span className="text-xs text-purple-400 font-semibold">
               已選 {selectedMusic.length} 項
             </span>
           </div>
 
-          {/* Category Tabs */}
-          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            <button
-              type="button"
-              onClick={() => setActiveCategory('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
-                activeCategory === 'all'
-                  ? 'bg-purple-600 text-white border-purple-400'
-                  : 'bg-slate-800 text-slate-400 border-slate-700'
-              }`}
-            >
-              全部流派
-            </button>
-            {GENRES.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => setActiveCategory(g.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
-                  activeCategory === g.id
-                    ? 'bg-purple-600 text-white border-purple-400'
-                    : 'bg-slate-800 text-slate-400 border-slate-700'
-                }`}
-              >
-                {g.nameZh.split('/')[0]}
-              </button>
-            ))}
+          {/* Granularity Mode Banner */}
+          <div
+            className={`px-3 py-2 rounded-xl border text-xs flex items-center justify-between ${
+              isCoarse
+                ? 'bg-indigo-950/60 border-indigo-700/60 text-indigo-300'
+                : 'bg-purple-950/60 border-purple-700/60 text-purple-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                主辦人設定：
+                <strong className="text-white">
+                  {isCoarse ? '寬鬆流派模式 (快速勾選)' : '細緻歌手模式 (含170+組藝人)'}
+                </strong>
+              </span>
+            </div>
+            <span className="text-[11px] font-mono text-slate-400">
+              {isCoarse ? '大類配對' : '歌手精配'}
+            </span>
           </div>
 
-          {/* Quick Search */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜尋歌手或曲風（例如：周杰倫、Yorushika、白小白）"
-              className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-400"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1"
-              >
-                ✕
-              </button>
-            )}
+          {/* Special "Any Genre" Notice if selected */}
+          {hasAnyGenreSelected && (
+            <div className="px-3.5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2">
+              <span className="text-base">🌟</span>
+              <span>
+                你已選擇<strong>「都可以 / 雜食派」</strong>：演算法將視為全能適配，與任何組別皆能完美融合！
+              </span>
+            </div>
+          )}
+
+          {/* Major Genres Multi-Select Grid (Available in both modes, primary in coarse mode) */}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-bold text-slate-400 flex items-center justify-between">
+              <span>主要音樂風格（點擊直接多選）：</span>
+              <span className="text-slate-500">支援複選</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {GENRES.map((genre) => {
+                const isSelected = selectedMusic.includes(genre.id);
+                const isAny = genre.id === 'any_genre';
+                return (
+                  <button
+                    key={genre.id}
+                    type="button"
+                    onClick={() => toggleMusic(genre.id)}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? isAny
+                          ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-bold ring-2 ring-amber-400/40'
+                          : 'bg-purple-600 text-white border-purple-400 shadow-md font-bold ring-2 ring-purple-400/30'
+                        : isAny
+                        ? 'bg-slate-800/90 hover:bg-slate-800 text-amber-300 border-amber-500/40'
+                        : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs font-bold truncate">
+                        {isAny && '🌟 '}
+                        {genre.nameZh}
+                      </span>
+                      {isSelected && (
+                        <Check
+                          className={`w-3.5 h-3.5 shrink-0 ${
+                            isAny ? 'text-slate-950' : 'text-purple-200'
+                          }`}
+                        />
+                      )}
+                    </div>
+                    {genre.subtext && (
+                      <div
+                        className={`text-[10px] mt-1 line-clamp-1 ${
+                          isSelected
+                            ? isAny
+                              ? 'text-slate-900 font-medium'
+                              : 'text-purple-200 font-medium'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        {genre.subtext}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Artists / Genres Pills Grid */}
-          <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto p-2 bg-slate-950/50 rounded-2xl border border-slate-800 touch-pan-y">
-            {filteredArtists.map((artist) => {
-              const isSelected = selectedMusic.includes(artist.id);
-              return (
-                <button
-                  key={artist.id}
-                  type="button"
-                  onClick={() => toggleMusic(artist.id)}
-                  className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 touch-manipulation ${
-                    isSelected
-                      ? 'bg-purple-900/60 border-purple-400 text-purple-200 shadow-md ring-1 ring-purple-400/50'
-                      : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-300'
-                  }`}
-                >
-                  <span>{artist.nameZh}</span>
-                  {isSelected && <Check className="w-3 h-3 text-purple-300" />}
-                </button>
-              );
-            })}
-          </div>
+          {/* Coarse Mode: Optional expander to reveal full artist library */}
+          {isCoarse && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowFullArtistLibrary(!showFullArtistLibrary)}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Search className="w-3.5 h-3.5 text-purple-400" />
+                <span>
+                  {showFullArtistLibrary
+                    ? '收起特定歌手搜尋庫'
+                    : '想特別指定喜愛的歌手？點此展開完整藝人庫 (170+ 組)'}
+                </span>
+                {showFullArtistLibrary ? (
+                  <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Specific Artists & Bands Cloud (Shown in fine mode, or when expanded in coarse mode) */}
+          {(!isCoarse || showFullArtistLibrary) && (
+            <div className="space-y-2.5 pt-2 border-t border-slate-800/80 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400">
+                  熱門歌手與樂團（170+ 組，支援即時搜尋與代表作配對）：
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">
+                  共 {filteredArtists.length} 組
+                </span>
+              </div>
+
+              {/* Category Filter Tabs */}
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                {artistCategoryFilters.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveCategory(tab.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
+                      activeCategory === tab.id
+                        ? 'bg-purple-600 text-white border-purple-400 shadow-sm'
+                        : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Quick Search with song title matching */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="搜尋歌手、樂團或代表作（例如：周杰倫、草東、Gravity、白小白、Yorushika、Wave to Earth、菸癮）"
+                  className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Artists Pills Cloud */}
+              <div className="flex flex-wrap gap-2 max-h-64 overflow-y-auto p-2 bg-slate-950/60 rounded-2xl border border-slate-800 touch-pan-y">
+                {filteredArtists.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-slate-500 w-full">
+                    查無符合「{searchQuery}」的歌手或歌曲，請嘗試不同關鍵字
+                  </div>
+                ) : (
+                  filteredArtists.map((artist) => {
+                    const isSelected = selectedMusic.includes(artist.id);
+                    return (
+                      <button
+                        key={artist.id}
+                        type="button"
+                        onClick={() => toggleMusic(artist.id)}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 touch-manipulation ${
+                          isSelected
+                            ? 'bg-purple-900/70 border-purple-400 text-purple-200 shadow-md ring-1 ring-purple-400/50'
+                            : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-300'
+                        }`}
+                        title={artist.subtext}
+                      >
+                        <span className="font-semibold">{artist.nameZh}</span>
+                        {isSelected && <Check className="w-3 h-3 text-purple-300 shrink-0" />}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {validationError && (

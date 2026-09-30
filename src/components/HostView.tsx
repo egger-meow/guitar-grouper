@@ -515,37 +515,40 @@ export function HostView({
 
             {/* Genre Granularity */}
             <div className="space-y-2">
-              <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider block">
-                曲風對齊顆粒度
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider block">
+                  曲風對齊顆粒度
+                </label>
+                <span className="text-[10px] text-emerald-400 font-medium">⚡ 社員端即時同步</span>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => handleGranularitySelect('coarse')}
-                  className={`py-2 px-3 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
+                  className={`py-2.5 px-3 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
                     settings.genreGranularity === 'coarse'
-                      ? 'bg-indigo-600 text-white border-indigo-400'
+                      ? 'bg-indigo-600 text-white border-indigo-400 shadow-md ring-2 ring-indigo-400/20'
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border-slate-700'
                   }`}
                 >
-                  寬鬆 (8大主要流派)
+                  寬鬆 (12大流派模式)
                 </button>
                 <button
                   type="button"
                   onClick={() => handleGranularitySelect('fine')}
-                  className={`py-2 px-3 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
+                  className={`py-2.5 px-3 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
                     settings.genreGranularity === 'fine'
-                      ? 'bg-indigo-600 text-white border-indigo-400'
+                      ? 'bg-indigo-600 text-white border-indigo-400 shadow-md ring-2 ring-indigo-400/20'
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border-slate-700'
                   }`}
                 >
-                  細緻 (含歌手/熱門歌手)
+                  細緻 (含170+歌手樂團)
                 </button>
               </div>
               <p className="text-[11px] text-slate-400">
                 {settings.genreGranularity === 'fine'
-                  ? '精準配對喜愛同一位歌手（如周杰倫、告五人、Yorushika、LB利比）的組員'
-                  : '依照大型流行、搖滾、獨立大類進行粗顆粒度配對'}
+                  ? '精準配對喜愛同一位歌手（如交大吉他熱門、告五人、Yorushika、Wave to Earth、白小白）的組員'
+                  : '社員端切為「12大主要風格大類」快速勾選，支援「都可以/雜食派」，最適合快速破冰迎新'}
               </p>
             </div>
 

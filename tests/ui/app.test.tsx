@@ -287,14 +287,14 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       fireEvent.click(genderBtn);
 
       // Instrument pills (multi-select)
-      const guitarPill = screen.getByRole('button', { name: /木吉他/i });
+      const guitarPill = screen.getAllByRole('button', { name: /木吉他/i })[0];
       const vocalPill = screen.getByRole('button', { name: /主唱/i });
       fireEvent.click(guitarPill);
       fireEvent.click(vocalPill);
 
       // Music style / artist pills (multi-select)
-      const jayChouPill = screen.getByRole('button', { name: /周杰倫/i });
-      const accusefivePill = screen.getByRole('button', { name: /告五人/i });
+      const jayChouPill = screen.getByRole('button', { name: /^周杰倫$/i });
+      const accusefivePill = screen.getByRole('button', { name: /^告五人$/i });
       fireEvent.click(jayChouPill);
       fireEvent.click(accusefivePill);
 
@@ -308,6 +308,52 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
           name: '阿杰',
           capabilities: expect.arrayContaining(['acoustic_guitar', 'lead_vocal']),
           musicPreferences: expect.arrayContaining(['jay_chou', 'accusefive']),
+        })
+      );
+    });
+
+    it('supports coarse mode with major genre multi-select and any_genre wildcard', () => {
+      const onSubmit = vi.fn();
+
+      render(
+        <ParticipantView
+          roomCode="BAND"
+          participant={null}
+          status="WAITING"
+          settings={{
+            ...DEFAULT_HOST_SETTINGS,
+            genreGranularity: 'coarse',
+          }}
+          onSubmit={onSubmit}
+        />
+      );
+
+      // Verify coarse mode banner
+      expect(screen.getByText(/寬鬆流派模式/i)).toBeTruthy();
+
+      // Enter name & role
+      fireEvent.change(screen.getByPlaceholderText(/你的暱稱|輸入姓名/i), {
+        target: { value: '小美' },
+      });
+      fireEvent.click(screen.getAllByRole('button', { name: /木吉他/i })[0]);
+
+      // Select "都可以 / 雜食派" and "台灣獨立樂團"
+      const anyGenreBtn = screen.getByRole('button', { name: /都可以 \/ 雜食派/i });
+      const indieRockBtn = screen.getByRole('button', { name: /台灣獨立樂團/i });
+      fireEvent.click(anyGenreBtn);
+      fireEvent.click(indieRockBtn);
+
+      // Verify notice appears
+      expect(screen.getByText(/全能適配/i)).toBeTruthy();
+
+      // Submit form
+      fireEvent.click(screen.getByRole('button', { name: /加入房間|立即加入/i }));
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: '小美',
+          capabilities: ['acoustic_guitar'],
+          musicPreferences: expect.arrayContaining(['any_genre', 'indie_rock']),
         })
       );
     });

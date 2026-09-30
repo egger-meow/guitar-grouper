@@ -33,37 +33,51 @@ describe('Domain Taxonomy & Real Data Verification', () => {
     expect(ROLE_MAP.lead_vocal.nameZh).toBe('主唱');
   });
 
-  it('should define all 8 real music genres', () => {
-    expect(GENRES).toHaveLength(8);
+  it('should define all 12 real music genres including any_genre wildcard', () => {
+    expect(GENRES).toHaveLength(12);
     const genreIds = GENRES.map((g) => g.id);
-    expect(genreIds).toEqual([
-      'mandopop_ballad',
-      'indie_rock',
-      'western_pop_rnb',
-      'western_rock',
-      'jpop_anime_jrock',
-      'hiphop_funk',
-      'cn_pop_indie',
-      'douyin_viral',
-    ]);
+    expect(genreIds).toContain('any_genre');
+    expect(genreIds).toContain('mandopop_ballad');
+    expect(genreIds).toContain('indie_rock');
+    expect(genreIds).toContain('campus_folk_acoustic');
+    expect(genreIds).toContain('western_pop_rnb');
+    expect(genreIds).toContain('western_rock');
+    expect(genreIds).toContain('jpop_anime_jrock');
+    expect(genreIds).toContain('kpop_kindie');
+    expect(genreIds).toContain('hiphop_funk');
+    expect(genreIds).toContain('cn_pop_indie');
+    expect(genreIds).toContain('douyin_viral');
+    expect(genreIds).toContain('heavy_metal_math');
   });
 
-  it('should contain authentic artists with real parent genres (no fake data)', () => {
+  it('should contain 150+ authentic artists with real parent genres (no fake data)', () => {
+    expect(ARTISTS.length).toBeGreaterThanOrEqual(150);
+
     // Japanese music
     expect(TAXONOMY_MAP.yorushika).toBeDefined();
     expect(TAXONOMY_MAP.yorushika.parentId).toBe('jpop_anime_jrock');
     expect(TAXONOMY_MAP.yoasobi.parentId).toBe('jpop_anime_jrock');
     expect(TAXONOMY_MAP.kessoku.parentId).toBe('jpop_anime_jrock');
 
-    // Mandopop & Taiwanese Indie
+    // Korean Indie & Pop
+    expect(TAXONOMY_MAP.wave_to_earth).toBeDefined();
+    expect(TAXONOMY_MAP.wave_to_earth.parentId).toBe('kpop_kindie');
+    expect(TAXONOMY_MAP.hyukoh.parentId).toBe('kpop_kindie');
+    expect(TAXONOMY_MAP.day6.parentId).toBe('kpop_kindie');
+
+    // Mandopop & Taiwanese Indie & Folk
     expect(TAXONOMY_MAP.jay_chou.parentId).toBe('mandopop_ballad');
-    expect(TAXONOMY_MAP.accusefive.parentId).toBe('mandopop_ballad');
+    expect(TAXONOMY_MAP.mayday.parentId).toBe('mandopop_ballad');
     expect(TAXONOMY_MAP.nodarty.parentId).toBe('indie_rock');
-    expect(TAXONOMY_MAP.fireex.parentId).toBe('indie_rock');
+    expect(TAXONOMY_MAP.accusefive.parentId).toBe('mandopop_ballad');
+    expect(TAXONOMY_MAP.cheer_chen.parentId).toBe('campus_folk_acoustic');
+    expect(TAXONOMY_MAP.katncandix2.parentId).toBe('campus_folk_acoustic');
+    expect(TAXONOMY_MAP.who_cares.parentId).toBe('indie_rock');
 
     // Western Pop & Rock
     expect(TAXONOMY_MAP.justin_bieber.parentId).toBe('western_pop_rnb');
     expect(TAXONOMY_MAP.keshi.parentId).toBe('western_pop_rnb');
+    expect(TAXONOMY_MAP.john_mayer.parentId).toBe('western_pop_rnb');
     expect(TAXONOMY_MAP.oasis.parentId).toBe('western_rock');
     expect(TAXONOMY_MAP.coldplay.parentId).toBe('western_rock');
 
@@ -72,13 +86,17 @@ describe('Domain Taxonomy & Real Data Verification', () => {
     expect(TAXONOMY_MAP.lb_libi.parentId).toBe('douyin_viral');
     expect(TAXONOMY_MAP.jing_long.parentId).toBe('douyin_viral');
     expect(TAXONOMY_MAP.li_ronghao.parentId).toBe('cn_pop_indie');
+
+    // Heavy & Math Rock
+    expect(TAXONOMY_MAP.polyphia.parentId).toBe('heavy_metal_math');
+    expect(TAXONOMY_MAP.flesh_juicer.parentId).toBe('heavy_metal_math');
   });
 
   it('should verify genre neighborhood relations', () => {
     expect(getGenreNeighborhoodWeight('indie_rock', 'western_rock')).toBeCloseTo(0.25, 2);
     expect(getGenreNeighborhoodWeight('western_rock', 'indie_rock')).toBeCloseTo(0.25, 2);
     expect(getGenreNeighborhoodWeight('mandopop_ballad', 'cn_pop_indie')).toBeGreaterThan(0);
-    expect(getGenreNeighborhoodWeight('jpop_anime_jrock', 'hiphop_funk')).toBe(0);
+    expect(getGenreNeighborhoodWeight('any_genre', 'jpop_anime_jrock')).toBe(1.0);
   });
 });
 
@@ -158,6 +176,16 @@ describe('Hierarchical Similarity Engine', () => {
     // Member B selected specific artist 'justin_bieber'
     const score = calculateHierarchicalSimilarity(['western_pop_rnb'], ['justin_bieber']);
     expect(score).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it('any_genre wildcard yields 1.0 compatibility with any musical style', () => {
+    // Member A has any_genre (open to anything)
+    // Member B has specific niche artists (Yorushika, Wave to Earth, Polyphia)
+    const score = calculateHierarchicalSimilarity(['any_genre'], ['yorushika', 'wave_to_earth', 'polyphia']);
+    expect(score).toBe(1.0);
+
+    const scoreReverse = calculateHierarchicalSimilarity(['nodarty'], ['any_genre']);
+    expect(scoreReverse).toBe(1.0);
   });
 });
 

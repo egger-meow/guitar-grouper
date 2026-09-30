@@ -7,6 +7,7 @@ import { TAXONOMY_MAP, getGenreNeighborhoodWeight } from './taxonomy';
 export function calculateItemSimilarity(idA: string, idB: string): number {
   if (!idA || !idB) return 0.0;
   if (idA === idB) return 1.0;
+  if (idA === 'any_genre' || idB === 'any_genre') return 1.0;
 
   const itemA = TAXONOMY_MAP[idA];
   const itemB = TAXONOMY_MAP[idB];
@@ -17,6 +18,7 @@ export function calculateItemSimilarity(idA: string, idB: string): number {
   const genreB = itemB.category === 'genre' ? itemB.id : itemB.parentId;
 
   if (!genreA || !genreB) return 0.0;
+  if (genreA === 'any_genre' || genreB === 'any_genre') return 1.0;
 
   // Same genre category
   if (genreA === genreB) {
@@ -61,6 +63,11 @@ export function calculateHierarchicalSimilarity(prefsA: string[], prefsB: string
 
   if (setA.length === 0 || setB.length === 0) {
     return 0.0;
+  }
+
+  // Wildcard: if either participant selected "any_genre", they are 100% compatible
+  if (setA.includes('any_genre') || setB.includes('any_genre')) {
+    return 1.0;
   }
 
   // Calculate best match for each item in setA against setB
@@ -129,12 +136,15 @@ export function findConsensusTags(members: Participant[]): string[] {
       if (b[1] !== a[1]) {
         return b[1] - a[1];
       }
-      // 2. Genres before artists
+      // 2. Specific genres/artists before any_genre wildcard
+      if (a[0] === 'any_genre' && b[0] !== 'any_genre') return 1;
+      if (a[0] !== 'any_genre' && b[0] === 'any_genre') return -1;
+      // 3. Genres before artists
       const isGenreA = TAXONOMY_MAP[a[0]]?.category === 'genre';
       const isGenreB = TAXONOMY_MAP[b[0]]?.category === 'genre';
       if (isGenreA && !isGenreB) return -1;
       if (!isGenreA && isGenreB) return 1;
-      // 3. Alphabetical tie-breaker
+      // 4. Alphabetical tie-breaker
       return a[0].localeCompare(b[0]);
     });
 
