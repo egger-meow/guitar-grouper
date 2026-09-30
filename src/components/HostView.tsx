@@ -28,8 +28,6 @@ import {
   KeyRound,
   ShieldCheck,
   Link as LinkIcon,
-  Minus,
-  Plus,
 } from 'lucide-react';
 import { calculateGroupCapacities } from '../engine/optimizer';
 
@@ -113,21 +111,9 @@ export function HostView({
   const minCap = estimatedCapacities.length > 0 ? Math.min(...estimatedCapacities) : currentMin;
   const maxCap = estimatedCapacities.length > 0 ? Math.max(...estimatedCapacities) : currentMax;
 
-  const handleRangePreset = (min: number, max: number) => {
-    const target = Math.round((min + max) / 2);
-    onUpdateSettings({
-      minGroupSize: min,
-      maxGroupSize: max,
-      targetGroupSize: target,
-    });
-  };
-
-  const handleMinChange = (delta: number) => {
-    let newMin = Math.max(2, Math.min(8, currentMin + delta));
-    let newMax = currentMax;
-    if (newMin > newMax) {
-      newMax = newMin;
-    }
+  const handleMinSlider = (val: number) => {
+    const newMin = Math.max(2, Math.min(8, val));
+    const newMax = Math.max(newMin, currentMax);
     const target = Math.round((newMin + newMax) / 2);
     onUpdateSettings({
       minGroupSize: newMin,
@@ -136,12 +122,9 @@ export function HostView({
     });
   };
 
-  const handleMaxChange = (delta: number) => {
-    let newMax = Math.max(2, Math.min(8, currentMax + delta));
-    let newMin = currentMin;
-    if (newMax < newMin) {
-      newMin = newMax;
-    }
+  const handleMaxSlider = (val: number) => {
+    const newMax = Math.max(2, Math.min(8, val));
+    const newMin = Math.min(newMax, currentMin);
     const target = Math.round((newMin + newMax) / 2);
     onUpdateSettings({
       minGroupSize: newMin,
@@ -353,85 +336,75 @@ export function HostView({
                 </div>
               </div>
 
-              {/* Quick Range Presets */}
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { min: 3, max: 5, label: '3 ~ 5 人', desc: '標準熱門團 (推薦)' },
-                  { min: 3, max: 4, label: '3 ~ 4 人', desc: '精實三四重奏' },
-                  { min: 4, max: 6, label: '4 ~ 6 人', desc: '大編制樂團' },
-                  { min: 2, max: 4, label: '2 ~ 4 人', desc: '不插電小編制' },
-                ].map((preset) => {
-                  const active = currentMin === preset.min && currentMax === preset.max;
-                  return (
-                    <button
-                      key={`${preset.min}-${preset.max}`}
-                      type="button"
-                      onClick={() => handleRangePreset(preset.min, preset.max)}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                        active
-                          ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-bold ring-2 ring-amber-400/30'
-                          : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700/80'
-                      }`}
-                    >
-                      <div className="text-xs font-bold">{preset.label}</div>
-                      <div className={`text-[10px] ${active ? 'text-slate-900 font-medium' : 'text-slate-400'}`}>
-                        {preset.desc}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Custom Min / Max Steppers */}
-              <div className="pt-2 border-t border-slate-800/60 grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-400 block">最少人數 (下限)</span>
-                  <div className="flex items-center justify-between bg-slate-800 rounded-xl p-1 border border-slate-700">
-                    <button
-                      type="button"
-                      disabled={currentMin <= 2}
-                      onClick={() => handleMinChange(-1)}
-                      className="w-8 h-8 rounded-lg bg-slate-700/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center cursor-pointer transition-all active:scale-95"
-                      title="減少最少人數"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="font-mono font-bold text-sm text-amber-300">{currentMin} 人</span>
-                    <button
-                      type="button"
-                      disabled={currentMin >= 7}
-                      onClick={() => handleMinChange(1)}
-                      className="w-8 h-8 rounded-lg bg-slate-700/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center cursor-pointer transition-all active:scale-95"
-                      title="增加最少人數"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+              {/* Dual-Thumb Range Slider */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-xs font-medium text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-slate-950 inline-block shadow-sm" />
+                    最少：<strong className="text-amber-300 font-mono font-bold text-sm">{currentMin}</strong> 人
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    最多：<strong className="text-amber-300 font-mono font-bold text-sm">{currentMax}</strong> 人
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-slate-950 inline-block shadow-sm" />
+                  </span>
                 </div>
 
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-400 block">最多人數 (上限)</span>
-                  <div className="flex items-center justify-between bg-slate-800 rounded-xl p-1 border border-slate-700">
-                    <button
-                      type="button"
-                      disabled={currentMax <= 2}
-                      onClick={() => handleMaxChange(-1)}
-                      className="w-8 h-8 rounded-lg bg-slate-700/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center cursor-pointer transition-all active:scale-95"
-                      title="減少最多人數"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="font-mono font-bold text-sm text-amber-300">{currentMax} 人</span>
-                    <button
-                      type="button"
-                      disabled={currentMax >= 8}
-                      onClick={() => handleMaxChange(1)}
-                      className="w-8 h-8 rounded-lg bg-slate-700/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center cursor-pointer transition-all active:scale-95"
-                      title="增加最多人數"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
+                <div className="relative py-4 px-1 flex items-center">
+                  {/* Base Track */}
+                  <div className="h-2.5 w-full bg-slate-800 rounded-full relative overflow-hidden">
+                    {/* Active Range Fill */}
+                    <div
+                      className="absolute top-0 bottom-0 bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full shadow-sm"
+                      style={{
+                        left: `${((currentMin - 2) / 6) * 100}%`,
+                        width: `${((currentMax - currentMin) / 6) * 100}%`,
+                      }}
+                    />
                   </div>
+
+                  {/* Left Thumb (Min) */}
+                  <input
+                    type="range"
+                    min={2}
+                    max={8}
+                    step={1}
+                    value={currentMin}
+                    aria-label="最少人數"
+                    onChange={(e) => handleMinSlider(Number(e.target.value))}
+                    className={`absolute inset-0 w-full appearance-none bg-transparent pointer-events-none cursor-pointer focus:outline-none ${
+                      currentMin > 5 ? 'z-20' : 'z-10'
+                    } [&::-webkit-slider-runnable-track]:bg-transparent [&::-moz-range-track]:bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-400 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-slate-950 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-grab active:[&::-webkit-slider-thumb]:cursor-grabbing hover:[&::-webkit-slider-thumb]:scale-110 active:[&::-webkit-slider-thumb]:scale-95 [&::-webkit-slider-thumb]:transition-transform [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-amber-400 [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-slate-950 [&::-moz-range-thumb]:shadow-lg [&::-moz-range-thumb]:cursor-grab active:[&::-moz-range-thumb]:cursor-grabbing hover:[&::-moz-range-thumb]:scale-110 active:[&::-moz-range-thumb]:scale-95 [&::-moz-range-thumb]:transition-transform`}
+                  />
+
+                  {/* Right Thumb (Max) */}
+                  <input
+                    type="range"
+                    min={2}
+                    max={8}
+                    step={1}
+                    value={currentMax}
+                    aria-label="最多人數"
+                    onChange={(e) => handleMaxSlider(Number(e.target.value))}
+                    className={`absolute inset-0 w-full appearance-none bg-transparent pointer-events-none cursor-pointer focus:outline-none ${
+                      currentMin > 5 ? 'z-10' : 'z-20'
+                    } [&::-webkit-slider-runnable-track]:bg-transparent [&::-moz-range-track]:bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-400 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-slate-950 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-grab active:[&::-webkit-slider-thumb]:cursor-grabbing hover:[&::-webkit-slider-thumb]:scale-110 active:[&::-webkit-slider-thumb]:scale-95 [&::-webkit-slider-thumb]:transition-transform [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-amber-400 [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-slate-950 [&::-moz-range-thumb]:shadow-lg [&::-moz-range-thumb]:cursor-grab active:[&::-moz-range-thumb]:cursor-grabbing hover:[&::-moz-range-thumb]:scale-110 active:[&::-moz-range-thumb]:scale-95 [&::-moz-range-thumb]:transition-transform`}
+                  />
+                </div>
+
+                {/* Tick Numbers */}
+                <div className="flex justify-between px-1 text-[11px] font-mono select-none">
+                  {[2, 3, 4, 5, 6, 7, 8].map((num) => (
+                    <span
+                      key={num}
+                      className={`transition-colors font-semibold ${
+                        num >= currentMin && num <= currentMax
+                          ? 'text-amber-300 font-bold'
+                          : 'text-slate-600'
+                      }`}
+                    >
+                      {num}人
+                    </span>
+                  ))}
                 </div>
               </div>
 

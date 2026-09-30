@@ -205,7 +205,7 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       expect(screen.getByRole('button', { name: /複製主辦連結/i })).toBeTruthy();
     });
 
-    it('allows room leader to select group size range presets and fine-tune min/max bounds', () => {
+    it('allows room leader to adjust group size range using dual-thumb slider', () => {
       const onUpdateSettings = vi.fn();
 
       render(
@@ -230,24 +230,32 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       expect(screen.getByText(/每組人數範圍/i)).toBeTruthy();
       expect(screen.getAllByText(/3 ~ 5 人/).length).toBeGreaterThanOrEqual(1);
 
-      // Select preset "4 ~ 6 人"
-      const preset46 = screen.getByRole('button', { name: /4 ~ 6 人/i });
-      fireEvent.click(preset46);
+      // Min and Max sliders
+      const minSlider = screen.getByLabelText(/最少人數/i) as HTMLInputElement;
+      const maxSlider = screen.getByLabelText(/最多人數/i) as HTMLInputElement;
 
-      expect(onUpdateSettings).toHaveBeenCalledWith(
-        expect.objectContaining({
-          minGroupSize: 4,
-          maxGroupSize: 6,
-          targetGroupSize: 5,
-        })
-      );
+      expect(minSlider).toBeTruthy();
+      expect(maxSlider).toBeTruthy();
+      expect(minSlider.value).toBe('3');
+      expect(maxSlider.value).toBe('5');
 
-      // Click stepper to decrease min group size
-      const decMinBtn = screen.getByTitle(/減少最少人數/i);
-      fireEvent.click(decMinBtn);
+      // Adjust min slider to 2
+      fireEvent.change(minSlider, { target: { value: '2' } });
       expect(onUpdateSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           minGroupSize: 2,
+          maxGroupSize: 5,
+          targetGroupSize: 4,
+        })
+      );
+
+      // Adjust max slider to 6
+      fireEvent.change(maxSlider, { target: { value: '6' } });
+      expect(onUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          minGroupSize: 3,
+          maxGroupSize: 6,
+          targetGroupSize: 5,
         })
       );
 
