@@ -93,8 +93,15 @@ export interface PartitionEvaluation {
     talentWaste: number;
     minRoleDeficit: number;
     sizeVariance: number;
+    deficitPenalty: number;
+    wastePenalty: number;
+    sizePenalty: number;
   };
   worstGroupScore: number;
+  worstGroupMusicScore: number;
+  worstGroupOverallScore: number;
+  avgRoleCoverage: number;
+  minRoleSatisfactionPct: number;
 }
 
 export interface OptimizationResult {
