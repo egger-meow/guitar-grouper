@@ -100,6 +100,10 @@ export interface MusicItem {
    - 知名代表：Yorushika (`yorushika`), YOASOBI (`yoasobi`), Aimer (`aimer`), Eve (`eve`), Official髭男dism (`higedan`), ONE OK ROCK (`oor`), 結束バンド (`kessoku`)
 6. **嘻哈 / 饒舌 / 放克 (`hiphop_funk`)**
    - 知名代表：蛋堡 (`softlipa`), 頑童MJ116 (`mj116`), 9m88 (`9m88`), 宇宙人 (`cosmospeople`), 落日飛車 (`sunset_rollercoaster`)
+7. **中國流行 / 民謠 / 獨立 (`cn_pop_indie`)**
+   - 知名代表：李榮浩 (`li_ronghao`), 薛之謙 (`joker_xue`), 毛不易 (`mao_buyi`), 郭頂 (`guo_ding`), 趙雷 (`zhao_lei`), 萬能青年旅店 (`omni_youth`), 房東的貓 (`landlord_cat`)
+8. **抖音神曲 / 短影音熱門 (`douyin_viral`)**
+   - 知名代表：隊長 / 哪裡都是你 (`young_captain`), 承桓 / 我會等 (`chenghuan`), 柳爽 / 漠河舞廳 (`liu_shuang`), 大籽 / 白月光與硃砂痣 (`dazi`), 烏梅子醬 (`wumei_sauce`), 抖音熱門吉他翻唱 (`douyin_hits`)
 
 ### 3.3 成員間音樂相似度計算 (Hierarchical Similarity)
 對參與者 $A$ 和 $B$ 的音樂偏好集合：

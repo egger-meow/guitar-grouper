@@ -13,7 +13,7 @@
 ## Global Constraints
 - Target domain: `guitar-grouper.jjmowlab.com` (and `guitar-group.jjmowlab.com`)
 - Cloudflare-native only: Workers + Durable Objects (`ROOM_DO`). No external database or Redis.
-- Zero mock or fake data in production; strictly real music artists (周杰倫, 告五人, 理想混蛋, 茄子蛋, Taylor Swift, keshi, Justin Bieber, Yorushika, YOASOBI, Aimer, etc.) and real guitar club instrument roles.
+- Zero mock or fake data in production; strictly real music artists (周杰倫, 告五人, 理想混蛋, 茄子蛋, 李榮浩, 薛之謙, 毛不易, 隊長, 承桓, Taylor Swift, keshi, Justin Bieber, Yorushika, YOASOBI, Aimer, etc.) and real guitar club instrument roles.
 - Traditional Chinese UI/UX for all user-facing screens and messages.
 - Rule 1: Always commit and push to `origin main` after completing each task/milestone.
 
@@ -77,7 +77,7 @@
   Types for `Participant`, `Role`, `RoleDefinition`, `MusicItem`, `HostSettings`, `GroupResult`, `PartitionDiagnostics`.
 - [ ] **Step 4: Implement taxonomy data in `src/engine/taxonomy.ts`**
   Populate verified instruments: 木吉他, 電吉他, 木箱鼓, 爵士鼓, 貝斯, 鍵盤, 主唱, 和聲.
-  Populate genres and artists including Yorushika, YOASOBI, Aimer, Eve, Jay Chou, Accusefive, Bestards, EggPlantEgg, Taylor Swift, Ed Sheeran, Justin Bieber, keshi, etc.
+  Populate genres and artists including Yorushika, YOASOBI, Aimer, Eve, Jay Chou, Accusefive, Bestards, EggPlantEgg, Taylor Swift, Ed Sheeran, Justin Bieber, keshi, Li Ronghao, Joker Xue, Mao Buyi, Captain, Chenghuan, Douyin viral guitar hits, etc.
 - [ ] **Step 5: Implement `similarity.ts`**
   Hierarchical fallback algorithm using artist-to-parent mapping, Jaccard/soft-cosine metric, consensus tag discovery.
 - [ ] **Step 6: Run tests to verify they pass**
