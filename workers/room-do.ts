@@ -369,7 +369,16 @@ export class RoomDO {
         );
       }
 
-      const body = (await request.json()) as any;
+      let body: any;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: 'INVALID_JSON', message: 'Malformed JSON payload' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       const rawParticipant = body.participant || body;
       const id = rawParticipant.id || crypto.randomUUID();
 
@@ -404,7 +413,16 @@ export class RoomDO {
 
     // REST: Update Settings (Host only)
     if (path.endsWith('/settings') && request.method === 'POST') {
-      const body = (await request.json()) as any;
+      let body: any;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: 'INVALID_JSON', message: 'Malformed JSON payload' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       const authHeader = request.headers.get('Authorization');
       const hostSecret = authHeader ? authHeader.replace('Bearer ', '') : body.hostSecret;
 
