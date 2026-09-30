@@ -44,6 +44,7 @@ export interface HostViewProps {
   onStartGrouping: () => void;
   onUpdateSettings: (settings: Partial<HostSettings>) => void;
   onRerunGrouping?: () => void;
+  onResetGrouping?: () => Promise<void>;
   onUnlockHost?: (secret: string) => void;
   onSwitchToParticipant?: () => void;
 }
@@ -59,9 +60,11 @@ export function HostView({
   onStartGrouping,
   onUpdateSettings,
   onRerunGrouping,
+  onResetGrouping,
   onUnlockHost,
   onSwitchToParticipant,
 }: HostViewProps) {
+  const [resetting, setResetting] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedHostLink, setCopiedHostLink] = useState(false);
@@ -1025,10 +1028,18 @@ export function HostView({
               <h3 className="text-2xl font-black text-white">樂團名單一覽 (Formed Bands)</h3>
             </div>
 
+            {onResetGrouping && (
+              <button type="button" disabled={resetting || status === 'OPTIMIZING'}
+                onClick={async () => { setResetting(true); try { await onResetGrouping(); } finally { setResetting(false); } }}
+                className="rounded-xl border border-amber-700 px-4 py-2 text-sm text-amber-200 disabled:opacity-50">
+                {resetting ? '正在返回…' : '返回待分組（保留名單）'}
+              </button>
+            )}
             {onRerunGrouping && (
               <button
                 type="button"
                 onClick={onRerunGrouping}
+                disabled={resetting || status === 'OPTIMIZING'}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold transition-all cursor-pointer"
               >
                 <RefreshCw className="w-4 h-4" />

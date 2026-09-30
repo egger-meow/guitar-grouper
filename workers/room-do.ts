@@ -95,8 +95,8 @@ export class RoomDO {
   private getParticipantView(participantId: string) {
     if (!this.room) return null;
     const participant = this.room.participants[participantId];
-    let assignedGroup: GroupResult | undefined;
-    let teammates: Participant[] | undefined;
+    let assignedGroup: GroupResult | null | undefined = null;
+    let teammates: Participant[] = [];
 
     if (this.room.status === 'REVEALED' && this.room.optimizationResult) {
       assignedGroup = this.room.optimizationResult.groups.find((g) =>
@@ -446,6 +446,22 @@ export class RoomDO {
       );
     }
 
+    // Return to the waiting room without removing participants or host settings.
+    if (path.endsWith('/reset') && request.method === 'POST') {
+      const secret = request.headers.get('Authorization')?.replace('Bearer ', '');
+      if (!secret || secret !== this.room.hostSecret) {
+        return Response.json({ error: 'UNAUTHORIZED', message: 'Invalid host secret' }, { status: 401 });
+      }
+      if (this.room.status === 'OPTIMIZING') {
+        return Response.json({ error: 'ALREADY_OPTIMIZING', message: '請待分組完成後再返回' }, { status: 409 });
+      }
+      this.room.status = 'WAITING';
+      this.room.optimizationResult = null;
+      await this.saveState();
+      this.broadcastRoomState();
+      return Response.json({ success: true, status: 'WAITING' });
+    }
+
     // REST: Start Grouping (Host only)
     if (path.endsWith('/start') && request.method === 'POST') {
       let body: any = {};
@@ -651,12 +667,12 @@ export class RoomDO {
           this.setAttachment(ws, { ...att, isHost: true });
         }
 
-        if (this.room.status !== 'WAITING') {
+        if (this.room.status === 'OPTIMIZING') {
           ws.send(
             JSON.stringify({
               type: 'ERROR',
               code: 'ALREADY_OPTIMIZING',
-              message: 'Grouping already in progress or completed',
+              message: 'Grouping already in progress',
             })
           );
           return;

@@ -36,6 +36,7 @@ export interface UseRoomSocketReturn {
   }) => Promise<void>;
   updateSettings: (settings: Partial<HostSettings>) => Promise<void>;
   startGrouping: () => Promise<void>;
+  resetGrouping: () => Promise<void>;
   refreshState: () => Promise<void>;
   authenticateHost: (secret: string) => Promise<void>;
 }
@@ -156,6 +157,7 @@ export function useRoomSocket(
 
       const data = (await res.json()) as any;
       if (data.status) setStatus(data.status);
+      if (data.status === 'WAITING') { setOptimizationResult(null); setAssignedGroup(null); setTeammates([]); }
       if (typeof data.participantCount === 'number') setParticipantCount(data.participantCount);
       if (data.settings) setSettings(data.settings);
       if (data.participants) setParticipants(data.participants);
@@ -217,6 +219,7 @@ export function useRoomSocket(
 
             case 'ROOM_STATE': {
               if (msg.status) setStatus(msg.status);
+              if (msg.status === 'WAITING') { setOptimizationResult(null); setAssignedGroup(null); setTeammates([]); }
               if (typeof msg.participantCount === 'number') setParticipantCount(msg.participantCount);
               if (msg.settings) setSettings(msg.settings);
               if (msg.participants) setParticipants(msg.participants);
@@ -426,6 +429,26 @@ export function useRoomSocket(
     [normalizedCode, getEffectiveSecret, options.isHost]
   );
 
+  const resetGrouping = useCallback(async () => {
+    if (!normalizedCode) return;
+    try {
+      const res = await fetch(`/api/room/${normalizedCode}/reset`, {
+        method: 'POST', headers: { Authorization: `Bearer ${getEffectiveSecret()}` },
+      });
+      if (!res.ok) {
+        const data = await res.json() as any;
+        throw new Error(data.message || '返回待分組失敗');
+      }
+      setStatus('WAITING');
+      setOptimizationResult(null);
+      setAssignedGroup(null);
+      setTeammates([]);
+      setError(null);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '返回待分組失敗');
+    }
+  }, [normalizedCode, getEffectiveSecret]);
+
   // Start Grouping Action (Host)
   const startGrouping = useCallback(async () => {
     if (!normalizedCode) return;
@@ -475,6 +498,7 @@ export function useRoomSocket(
     joinRoom,
     updateSettings,
     startGrouping,
+    resetGrouping,
     refreshState,
     authenticateHost,
   };

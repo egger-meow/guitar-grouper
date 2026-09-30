@@ -295,6 +295,39 @@ describe('Task 6: Cloudflare Durable Object Room Coordination & WebSocket Protoc
     });
   });
 
+  it('returns to WAITING with settings and members retained, broadcasts reset, and permits regrouping', async () => {
+    const call = (path: string, body: unknown = {}, secret = '') => worker.fetch(new Request(`http://localhost/api/room/${path}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` }, body: JSON.stringify(body),
+    }), env as any, {} as any);
+    const { roomCode, hostSecret } = await (await call('create')).json() as any;
+    const joined = await (await call(`${roomCode}/join`, { name: 'Reset fixture', gender: 'F', capabilities: ['acoustic_guitar'], musicPreferences: ['any_genre'] })).json() as any;
+    await call(`${roomCode}/settings`, { settings: { groupSizePreference: 'smaller' } }, hostSecret);
+    const socketRes = await worker.fetch(new Request(`http://localhost/api/room/${roomCode}/ws?participantId=${joined.participantId}`, { headers: { Upgrade: 'websocket' } }), env as any, {} as any);
+    const socket = (socketRes as any).webSocket;
+    await call(`${roomCode}/start`, {}, hostSecret);
+    expect((await call(`${roomCode}/reset`, {}, 'bad')).status).toBe(401);
+    socket.receivedMessages = [];
+    expect((await call(`${roomCode}/reset`, {}, hostSecret)).status).toBe(200);
+    const entry = env.ROOM_DO.getInstance(roomCode)!;
+    const state = await (await entry.do.fetch(new Request(`http://localhost/state?hostSecret=${hostSecret}`))).json() as any;
+    expect(state.status).toBe('WAITING');
+    expect(state.result).toBeNull();
+    expect(state.participantCount).toBe(1);
+    expect(state.settings.groupSizePreference).toBe('smaller');
+    const message = socket.receivedMessages.map((m: string) => JSON.parse(m)).find((m: any) => m.type === 'ROOM_STATE');
+    expect(message.status).toBe('WAITING');
+    expect(message.assignedGroup).toBeNull();
+    expect(message.teammates).toEqual([]);
+    expect((await call(`${roomCode}/join`, { name: 'New member after reset', capabilities: ['lead_vocal'] })).status).toBe(200);
+    expect((await call(`${roomCode}/start`, {}, hostSecret)).status).toBe(200);
+    // The visible rerun button uses WebSocket, which must also allow REVEALED.
+    const hostSocketRes = await worker.fetch(new Request(`http://localhost/api/room/${roomCode}/ws?hostSecret=${hostSecret}`, { headers: { Upgrade: 'websocket' } }), env as any, {} as any);
+    const hostSocket = (hostSocketRes as any).webSocket;
+    hostSocket.receivedMessages = [];
+    hostSocket.send(JSON.stringify({ type: 'HOST_START_GROUPING' }));
+    await vi.waitFor(() => expect(hostSocket.receivedMessages.map((m: string) => JSON.parse(m)).some((m: any) => m.type === 'GROUPING_RESULT')).toBe(true));
+  });
+
   describe('4. Grouping Lifecycle', () => {
     it('transitions WAITING -> OPTIMIZING -> REVEALED, runs optimizer, and broadcasts GROUPING_RESULT', async () => {
       // Create room

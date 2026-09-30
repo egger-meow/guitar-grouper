@@ -84,6 +84,7 @@ export function App() {
     joinRoom,
     updateSettings,
     startGrouping,
+    resetGrouping,
     authenticateHost,
   } = useRoomSocket(route.room, {
     isHost: route.host,
@@ -281,6 +282,7 @@ export function App() {
             onStartGrouping={startGrouping}
             onUpdateSettings={updateSettings}
             onRerunGrouping={startGrouping}
+            onResetGrouping={resetGrouping}
             onUnlockHost={(secret) => {
               authenticateHost(secret);
               navigateTo({ room: route.room, host: true, secret });
