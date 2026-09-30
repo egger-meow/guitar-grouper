@@ -41,6 +41,8 @@ export type PresetType = 'music_focus' | 'role_focus' | 'balanced' | 'custom';
 export type GenreGranularity = 'coarse' | 'fine';
 
 export interface HostSettings {
+  /** Independent slider ratios; weights contain their normalized calculation values. */
+  weightRatios?: { role: number; music: number; diversity: number };
   targetGroupSize: number;
   groupSizePreference?: 'larger' | 'smaller' | 'any';
   groupSizePreferenceWeight?: number;

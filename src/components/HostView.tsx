@@ -135,6 +135,8 @@ export function HostView({
     }
   };
 
+  const sliderRatios = settings.weightRatios ?? settings.weights;
+
   const handlePresetSelect = (preset: PresetType) => {
     const weights =
       preset === 'custom'
@@ -143,6 +145,7 @@ export function HostView({
     onUpdateSettings({
       preset,
       weights,
+      weightRatios: preset === 'custom' ? sliderRatios : weights,
     });
     if (preset === 'custom') {
       setCustomWeightsOpen(true);
@@ -150,30 +153,12 @@ export function HostView({
   };
 
   const handleWeightChange = (field: 'role' | 'music' | 'diversity', val: number) => {
-    const currentWeights = settings.weights || { role: 0.45, music: 0.4, diversity: 0.15 };
+    const currentWeights = sliderRatios || { role: 0.45, music: 0.4, diversity: 0.15 };
     onUpdateSettings({
       preset: 'custom',
-      weights: {
+      weightRatios: {
         ...currentWeights,
         [field]: Math.max(0, Math.min(100, val)) / 100,
-      },
-    });
-  };
-
-  const handleNormalizeWeights = () => {
-    const r = settings.weights?.role ?? 0.45;
-    const m = settings.weights?.music ?? 0.4;
-    const d = settings.weights?.diversity ?? 0.15;
-    const sum = r + m + d || 1;
-    const normR = Math.round((r / sum) * 100) / 100;
-    const normM = Math.round((m / sum) * 100) / 100;
-    const normD = Math.max(0, Math.round((1 - normR - normM) * 100) / 100);
-    onUpdateSettings({
-      preset: 'custom',
-      weights: {
-        role: normR,
-        music: normM,
-        diversity: normD,
       },
     });
   };
@@ -669,7 +654,7 @@ export function HostView({
                           <span>🎸</span> 樂器配置與角色完整度
                         </span>
                         <span className="font-mono font-bold text-blue-400 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-800">
-                          {Math.round((settings.weights?.role ?? 0.45) * 100)}%
+                          {Math.round((sliderRatios?.role ?? 0.45) * 100)}
                         </span>
                       </div>
                       <input
@@ -678,7 +663,7 @@ export function HostView({
                         max={100}
                         step={5}
                         aria-label="樂器配置權重"
-                        value={Math.round((settings.weights?.role ?? 0.45) * 100)}
+                        value={Math.round((sliderRatios?.role ?? 0.45) * 100)}
                         onChange={(e) => handleWeightChange('role', Number(e.target.value))}
                         className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
                       />
@@ -694,7 +679,7 @@ export function HostView({
                           <span>🎵</span> 曲風品味契合度
                         </span>
                         <span className="font-mono font-bold text-purple-400 bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800">
-                          {Math.round((settings.weights?.music ?? 0.4) * 100)}%
+                          {Math.round((sliderRatios?.music ?? 0.4) * 100)}
                         </span>
                       </div>
                       <input
@@ -703,7 +688,7 @@ export function HostView({
                         max={100}
                         step={5}
                         aria-label="曲風品味權重"
-                        value={Math.round((settings.weights?.music ?? 0.4) * 100)}
+                        value={Math.round((sliderRatios?.music ?? 0.4) * 100)}
                         onChange={(e) => handleWeightChange('music', Number(e.target.value))}
                         className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
                       />
@@ -719,7 +704,7 @@ export function HostView({
                           <span>👥</span> 性別多元平衡
                         </span>
                         <span className="font-mono font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
-                          {Math.round((settings.weights?.diversity ?? 0.15) * 100)}%
+                          {Math.round((sliderRatios?.diversity ?? 0.15) * 100)}
                         </span>
                       </div>
                       <input
@@ -728,7 +713,7 @@ export function HostView({
                         max={100}
                         step={5}
                         aria-label="性別多元權重"
-                        value={Math.round((settings.weights?.diversity ?? 0.15) * 100)}
+                        value={Math.round((sliderRatios?.diversity ?? 0.15) * 100)}
                         onChange={(e) => handleWeightChange('diversity', Number(e.target.value))}
                         className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                       />
@@ -737,41 +722,8 @@ export function HostView({
                       </div>
                     </div>
 
-                    {/* Total Weight Summary & Quick Reset */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400">權重合計:</span>
-                        <span
-                          className={`font-mono font-bold px-2 py-0.5 rounded ${
-                            Math.round(
-                              ((settings.weights?.role ?? 0.45) +
-                                (settings.weights?.music ?? 0.4) +
-                                (settings.weights?.diversity ?? 0.15)) *
-                                100
-                            ) === 100
-                              ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-700/50'
-                              : 'bg-amber-900/50 text-amber-300 border border-amber-700/50'
-                          }`}
-                        >
-                          {Math.round(
-                            ((settings.weights?.role ?? 0.45) +
-                              (settings.weights?.music ?? 0.4) +
-                              (settings.weights?.diversity ?? 0.15)) *
-                              100
-                          )}
-                          %
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={handleNormalizeWeights}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-medium transition-colors cursor-pointer"
-                        >
-                          ⚡ 歸一化至 100%
-                        </button>
-                      </div>
+                    <div className="pt-2 border-t border-slate-800/80 text-xs text-slate-400">
+                      三個滑桿獨立調整相對比例，系統自動換算為合計 100% 的計算權重；全部為 0 時採均衡預設。
                     </div>
                   </div>
 
@@ -1068,7 +1020,7 @@ export function HostView({
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs px-2 py-0.5 rounded bg-purple-900/60 text-purple-300 border border-purple-700/50">
-                      曲風: {Math.round(group.musicScore)}分
+                      曲風: {Math.round(group.musicScore)} / 100
                     </span>
                     <span className="text-xs px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700/50">
                       配置: {Math.round(group.roleScore)}分

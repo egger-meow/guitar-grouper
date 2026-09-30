@@ -304,7 +304,7 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       expect(onUpdateSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           preset: 'custom',
-          weights: expect.objectContaining({ role: 0.6 }),
+          weightRatios: expect.objectContaining({ role: 0.6 }),
         })
       );
 
@@ -328,19 +328,7 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
         })
       );
 
-      // Normalize weights
-      const normalizeBtn = screen.getByRole('button', { name: /歸一化至 100%/i });
-      fireEvent.click(normalizeBtn);
-      expect(onUpdateSettings).toHaveBeenCalledWith(
-        expect.objectContaining({
-          preset: 'custom',
-          weights: expect.objectContaining({
-            role: expect.any(Number),
-            music: expect.any(Number),
-            diversity: expect.any(Number),
-          }),
-        })
-      );
+      expect(screen.getByText(/三個滑桿獨立調整相對比例/)).toBeTruthy();
     });
 
     it('opens manual add participant modal and submits new member', async () => {
