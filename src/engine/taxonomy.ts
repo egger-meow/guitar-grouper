@@ -235,3 +235,7 @@ export const DEFAULT_HOST_SETTINGS: HostSettings = {
   minRequiredRolesCount: 1,
   keyRoles: ['acoustic_guitar', 'electric_guitar', 'cajon', 'lead_vocal'],
 };
+
+export const ROLE_DEFINITIONS = ROLES;
+export { PRESET_WEIGHTS } from './scoring';
+
