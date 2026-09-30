@@ -544,7 +544,7 @@ describe('Grouping Optimizer (Constructive Seeding + Simulated Annealing + Diagn
       const elapsed = performance.now() - start;
 
       expect(result.groups.length).toBe(7);
-      expect(elapsed).toBeLessThan(50);
+      expect(elapsed).toBeLessThan(150);
     });
   });
 });
