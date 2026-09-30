@@ -6,8 +6,8 @@ import { TAXONOMY_MAP, getGenreNeighborhoodWeight } from './taxonomy';
  */
 export function calculateItemSimilarity(idA: string, idB: string): number {
   if (!idA || !idB) return 0.0;
+  if (idA === 'any_genre' || idB === 'any_genre') return 0.5;
   if (idA === idB) return 1.0;
-  if (idA === 'any_genre' || idB === 'any_genre') return 1.0;
 
   const itemA = TAXONOMY_MAP[idA];
   const itemB = TAXONOMY_MAP[idB];
@@ -65,9 +65,9 @@ export function calculateHierarchicalSimilarity(prefsA: string[], prefsB: string
     return 0.0;
   }
 
-  // Wildcard: if either participant selected "any_genre", they are 100% compatible
+  // Unspecified taste is neutral, not evidence of shared preferences.
   if (setA.includes('any_genre') || setB.includes('any_genre')) {
-    return 1.0;
+    return 0.5;
   }
 
   // Calculate best match for each item in setA against setB
@@ -107,7 +107,7 @@ export function calculateHierarchicalSimilarity(prefsA: string[], prefsB: string
  */
 export function findConsensusTags(members: Participant[]): string[] {
   if (!members || members.length < 2) {
-    return members?.[0]?.musicPreferences ?? [];
+    return (members?.[0]?.musicPreferences ?? []).filter(p => p !== 'any_genre');
   }
 
   const tagCounts = new Map<string, number>();
@@ -115,7 +115,7 @@ export function findConsensusTags(members: Participant[]): string[] {
   for (const member of members) {
     const memberTagSet = new Set<string>();
     for (const pref of member.musicPreferences) {
-      if (!pref) continue;
+      if (!pref || pref === 'any_genre') continue;
       memberTagSet.add(pref);
       const item = TAXONOMY_MAP[pref];
       if (item?.parentId) {
@@ -154,7 +154,7 @@ export function findConsensusTags(members: Participant[]): string[] {
 /**
  * Evaluates the musical harmony of a group of participants
  */
-export function calculateGroupMusicScore(members: Participant[]): GroupMusicEvaluation {
+export function calculateGroupMusicScore(members: Participant[], getSim: (a: Participant, b: Participant) => number = (a, b) => calculateHierarchicalSimilarity(a.musicPreferences, b.musicPreferences)): GroupMusicEvaluation {
   if (!members || members.length === 0) {
     return {
       avgPairwise: 0,
@@ -169,7 +169,7 @@ export function calculateGroupMusicScore(members: Participant[]): GroupMusicEval
       avgPairwise: 1.0,
       minPairwise: 1.0,
       consensusTags: [...(members[0].musicPreferences ?? [])],
-      compositeScore: 1.0,
+      compositeScore: 0.5,
     };
   }
 
@@ -177,10 +177,7 @@ export function calculateGroupMusicScore(members: Participant[]): GroupMusicEval
 
   for (let i = 0; i < members.length; i++) {
     for (let j = i + 1; j < members.length; j++) {
-      const sim = calculateHierarchicalSimilarity(
-        members[i].musicPreferences,
-        members[j].musicPreferences
-      );
+      const sim = getSim(members[i], members[j]);
       pairwiseScores.push(sim);
     }
   }
@@ -216,6 +213,7 @@ export function calculateGroupMusicScore(members: Participant[]): GroupMusicEval
   for (const m of members) {
     const s = new Set<string>();
     for (const p of m.musicPreferences) {
+      if (!p || p === 'any_genre') continue;
       s.add(p);
       if (TAXONOMY_MAP[p]?.parentId) s.add(TAXONOMY_MAP[p].parentId!);
     }

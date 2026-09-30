@@ -126,7 +126,7 @@ describe('Global Partition Scoring Model (Fitness Function)', () => {
   });
 
   describe('2. Diminishing Returns', () => {
-    it('adding a 3rd guitarist provides significantly less marginal score gain than adding the 1st guitarist', () => {
+    it('duplicated guitarists provide zero additional role coverage', () => {
       const gtr1: Participant = {
         id: 'g1',
         name: 'Gtr1',
@@ -174,13 +174,13 @@ describe('Global Partition Scoring Model (Fitness Function)', () => {
       const marginalGain3rd = score3 - score2;
 
       expect(marginalGain1st).toBeGreaterThan(0);
-      expect(marginalGain3rd).toBeGreaterThan(0);
-      // Gain(3) / Gain(1) = 1 / (1 + 0.8 * 2) = 1 / 2.6 ≈ 0.385
+      expect(marginalGain3rd).toBe(0);
+      // Only the first assignable occurrence of a role contributes.
       expect(marginalGain3rd).toBeLessThan(marginalGain1st * 0.5);
     });
   });
 
-  describe('3. Core Failure Scenario: Talent Waste Penalty', () => {
+  describe('3. Core Failure Scenario: Usable Talent', () => {
     it('moving 1 flexible multi-skilled player from clustered Group A to single-skill Group B dramatically improves partition score', () => {
       // 3 versatile triple-threats (guitar + cajon + vocal)
       const versatile1: Participant = {
@@ -258,18 +258,18 @@ describe('Global Partition Scoring Model (Fitness Function)', () => {
       const flawedEval = scorePartition(flawedPartition, defaultSettings, allParticipants);
       const improvedEval = scorePartition(improvedPartition, defaultSettings, allParticipants);
 
-      // Flawed partition should trigger both talent waste and deficit penalties
-      expect(flawedEval.penalties.talentWaste).toBeGreaterThan(0);
+      // Missing assignable roles trigger deficits, not a generic versatility penalty.
+      expect(flawedEval.penalties.talentWaste).toBe(0);
       expect(flawedEval.penalties.minRoleDeficit).toBeGreaterThan(0);
-      expect(flawedEval.penalties.wastePenalty).toBeGreaterThan(0);
+      expect(flawedEval.penalties.wastePenalty).toBe(0);
       expect(flawedEval.penalties.deficitPenalty).toBeGreaterThan(0);
 
       // Improved partition should resolve deficit and talent waste
       expect(improvedEval.penalties.talentWaste).toBe(0);
       expect(improvedEval.penalties.minRoleDeficit).toBe(0);
 
-      // Global partition score must dramatically improve (> 25 points improvement)
-      expect(improvedEval.totalScore - flawedEval.totalScore).toBeGreaterThan(25);
+      // Redistributing usable capabilities improves the partition.
+      expect(improvedEval.totalScore - flawedEval.totalScore).toBeGreaterThan(0);
     });
   });
 

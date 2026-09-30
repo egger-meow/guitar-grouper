@@ -19,6 +19,8 @@ import {
 } from './similarity';
 import { ROLES, ROLE_MAP, TAXONOMY_MAP } from './taxonomy';
 import { createPrng } from './prng';
+import { assignRoles } from './roles';
+import { normalizeHostSettings } from './settings';
 
 /**
  * Friendly short Chinese names for role display
@@ -43,6 +45,44 @@ interface CachedGroupEval {
   coveragePct: number;
   excessVersatile: number;
   overallScore: number;
+}
+
+export function getGroupCapacityCandidates(count: number, settings: Partial<HostSettings>): { K: number; capacities: number[] }[] {
+  if (count <= 0) return [];
+  if (settings.minGroupSize === undefined && settings.maxGroupSize === undefined) return [calculateGroupCapacities(count, settings)];
+  const min = Math.max(1, settings.minGroupSize ?? 3);
+  const max = Math.max(min, settings.maxGroupSize ?? 5);
+  const low = Math.max(1, Math.ceil(count / max));
+  const high = Math.floor(count / min);
+  if (low > high) return [calculateGroupCapacities(count, settings)];
+  return Array.from({ length: high - low + 1 }, (_, i) => {
+    const K = low + i;
+    return { K, capacities: Array.from({ length: K }, (_, j) => Math.floor(count / K) + (j < count % K ? 1 : 0)) };
+  });
+}
+
+function repairPartition(partition: Participant[][], settings: HostSettings, all: Participant[]): Participant[][] {
+  if (all.length > 60) return partition;
+  const required = Math.min(settings.desiredRoles.length, settings.minRequiredRolesCount);
+  const deficit = (group: Participant[]) => Math.max(0, required - assignRoles(group, settings.desiredRoles).length);
+  const deficits = partition.map(deficit);
+  if (deficits.every(d => d === 0)) return partition;
+  // Exhaustive checks of affected groups only; strictly decrease total deficit.
+  for (let pass = 0; pass < all.length; pass++) {
+    let improved = false;
+    for (let a = 0; a < partition.length; a++) for (let b = a + 1; b < partition.length; b++) {
+      if (deficits[a] + deficits[b] === 0) continue;
+      for (let i = 0; i < partition[a].length; i++) for (let j = 0; j < partition[b].length; j++) {
+        [partition[a][i], partition[b][j]] = [partition[b][j], partition[a][i]];
+        const da = deficit(partition[a]);
+        const db = deficit(partition[b]);
+        if (da + db < deficits[a] + deficits[b]) { deficits[a] = da; deficits[b] = db; improved = true; }
+        else [partition[a][i], partition[b][j]] = [partition[b][j], partition[a][i]];
+      }
+    }
+    if (!improved) break;
+  }
+  return partition;
 }
 
 /**
@@ -112,7 +152,7 @@ export function calculateGroupCapacities(
   const defaultMax = defaultRem > 0 ? defaultBase + 1 : defaultBase;
 
   // If defaultK perfectly satisfies the [minSize, maxSize] range, preserve it!
-  if (defaultMin >= minSize && defaultMax <= maxSize) {
+  if ((targetOrSettings.groupSizePreference ?? 'any') === 'any' && defaultMin >= minSize && defaultMax <= maxSize) {
     const capacities: number[] = new Array(defaultK);
     for (let i = 0; i < defaultK; i++) {
       capacities[i] = i < defaultRem ? defaultBase + 1 : defaultBase;
@@ -154,7 +194,7 @@ export function calculateGroupCapacities(
     }
 
     // Proximity to defaultK
-    penalty += Math.abs(k - defaultK) * 10;
+    penalty += targetOrSettings.groupSizePreference === 'larger' ? k : targetOrSettings.groupSizePreference === 'smaller' ? -k : Math.abs(k - defaultK) * 10;
 
     if (penalty < minPenalty) {
       minPenalty = penalty;
@@ -207,7 +247,7 @@ function generateRoleWarnings(
         );
       } else {
         warnings.push(
-          `本次共有 ${groupCount} 組，但全場僅有 ${count} 位社員會${roleZh}，系統已盡可能平均分配。`
+          `本次共有 ${groupCount} 組，但全場僅有 ${count} 位社員會${roleZh}，至少有 ${groupCount - count} 組無法配置此角色。`
         );
       }
     }
@@ -223,7 +263,6 @@ function evalSingleGroup(
   group: Participant[],
   scarcityWeights: Record<Role, number>,
   desiredRoles: Role[],
-  keyRoles: Role[],
   minRequiredRolesCount: number,
   weights: { role: number; music: number; diversity: number },
   distinctGenders: string[],
@@ -243,89 +282,10 @@ function evalSingleGroup(
     };
   }
 
-  // 1. Role score
-  const roleCounts: Partial<Record<Role, number>> = {};
-  for (const r of desiredRoles) {
-    roleCounts[r] = 0;
-  }
-  for (const m of group) {
-    for (const cap of m.capabilities || []) {
-      if (cap in roleCounts) {
-        roleCounts[cap] = (roleCounts[cap] ?? 0) + 1;
-      }
-    }
-  }
-
-  let totalUtility = 0;
-  let targetIdealUtility = 0;
-  for (const r of desiredRoles) {
-    const Wr = scarcityWeights[r] ?? 1.0;
-    targetIdealUtility += Wr;
-    const count = roleCounts[r] ?? 0;
-    for (let k = 1; k <= count; k++) {
-      totalUtility += Wr / (1 + 0.8 * (k - 1));
-    }
-  }
-  const roleScore =
-    targetIdealUtility > 0
-      ? Math.min(100, Math.round(((totalUtility / targetIdealUtility) * 100) * 100) / 100)
-      : 0;
-
-  // 2. Music score
-  let musicScore = 0;
-  if (group.length === 1) {
-    musicScore = 100;
-  } else {
-    let sumPairwise = 0;
-    let minPairwise = Infinity;
-    let pairCount = 0;
-    for (let i = 0; i < group.length; i++) {
-      for (let j = i + 1; j < group.length; j++) {
-        const sim = getSim(group[i], group[j]);
-        sumPairwise += sim;
-        if (sim < minPairwise) minPairwise = sim;
-        pairCount++;
-      }
-    }
-    const avgPair = pairCount > 0 ? sumPairwise / pairCount : 0;
-    const minPair = pairCount > 0 ? minPairwise : 0;
-
-    if (avgPair === 0) {
-      musicScore = 0;
-    } else {
-      // Consensus bonus
-      const tagCounts = new Map<string, number>();
-      for (const m of group) {
-        const s = new Set<string>();
-        for (const p of m.musicPreferences || []) {
-          s.add(p);
-          if (TAXONOMY_MAP[p]?.parentId) s.add(TAXONOMY_MAP[p].parentId!);
-        }
-        for (const t of s) {
-          tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
-        }
-      }
-
-      let maxShared = 0;
-      let sharedCountGte2 = 0;
-      for (const cnt of tagCounts.values()) {
-        if (cnt > maxShared) maxShared = cnt;
-        if (cnt >= 2) sharedCountGte2++;
-      }
-
-      let consensusBonus = 0;
-      if (maxShared >= group.length) {
-        consensusBonus = 0.05;
-      } else if (sharedCountGte2 > 0) {
-        consensusBonus = 0.02;
-      }
-
-      const baseMusic = 0.7 * avgPair + 0.3 * minPair;
-      const composite = Math.min(1.0, Math.round((baseMusic + consensusBonus) * 10000) / 10000);
-      musicScore = Math.round(composite * 10000) / 100;
-    }
-  }
-
+  // Canonical scoring, including feasible role assignments and music consensus.
+  const assigned = assignRoles(group, desiredRoles, scarcityWeights);
+  const roleScore = calculateGroupRoleScore(group, scarcityWeights, desiredRoles, assigned);
+  const musicScore = Math.round(calculateGroupMusicScore(group, getSim).compositeScore * 10000) / 100;
   // 3. Diversity score
   let diversityScore = 100;
   if (distinctGenders.length > 1) {
@@ -343,18 +303,11 @@ function evalSingleGroup(
     diversityScore = Math.max(0, (1.0 - 0.5 * tvd) * 100);
   }
 
-  // 4. Deficit and coverage
-  const coveredKey = new Set<Role>();
-  const coveredDesired = new Set<Role>();
-  for (const m of group) {
-    for (const cap of m.capabilities || []) {
-      if (keyRoles.includes(cap)) coveredKey.add(cap);
-      if (desiredRoles.includes(cap)) coveredDesired.add(cap);
-    }
-  }
-  const deficit = Math.max(0, minRequiredRolesCount - coveredKey.size);
+  // 4. Deficit and feasible coverage
+  const assignedCount = assigned.length;
+  const deficit = Math.max(0, Math.min(desiredRoles.length, minRequiredRolesCount) - assignedCount);
   const coveragePct =
-    desiredRoles.length > 0 ? (coveredDesired.size / desiredRoles.length) * 100 : 100;
+    desiredRoles.length > 0 ? (assignedCount / desiredRoles.length) * 100 : 100;
 
   // 5. Versatile player excess
   const versatileMembers = group.filter((m) => m.capabilities && m.capabilities.length >= 3);
@@ -396,7 +349,6 @@ function computeCompositeTotalScore(
   let minMusic = Infinity;
   let minOverall = Infinity;
   let totalDeficit = 0;
-  let totalExcessVersatile = 0;
 
   for (let i = 0; i < K; i++) {
     const ge = groupEvals[i];
@@ -406,7 +358,6 @@ function computeCompositeTotalScore(
     if (ge.musicScore < minMusic) minMusic = ge.musicScore;
     if (ge.overallScore < minOverall) minOverall = ge.overallScore;
     totalDeficit += ge.deficit;
-    totalExcessVersatile += ge.excessVersatile;
   }
 
   const roleScore = Math.round((sumRole / K) * 100) / 100;
@@ -424,21 +375,15 @@ function computeCompositeTotalScore(
   const excessSizeVariance = Math.max(0, sizeVariance - 0.25);
   const sizePenalty = Math.round(excessSizeVariance * 10.0 * 100) / 100;
 
-  const deficitPenalty = Math.round(totalDeficit * 15.0 * 100) / 100;
-
-  let wastePenalty = 0;
-  if (totalDeficit > 0 && totalExcessVersatile > 0) {
-    wastePenalty =
-      Math.round(totalExcessVersatile * 12.0 * Math.min(2, totalDeficit) * 100) / 100;
-  }
 
   const worstGroupOverall = Math.round(minOverall * 100) / 100;
   const weightedBaseScore =
     weights.role * roleScore + weights.music * musicScore + weights.diversity * diversityScore;
   const blendedScore = 0.85 * weightedBaseScore + 0.15 * worstGroupOverall;
-  const totalPenalties = deficitPenalty + wastePenalty + sizePenalty;
 
-  return Math.max(0, Math.min(100, Math.round((blendedScore - totalPenalties) * 100) / 100));
+  // Lexicographic search: one less required-role deficit dominates all soft scores.
+  // Keep this unbounded search utility separate from the displayed 0..100 score.
+  return -totalDeficit * 1000 + blendedScore - sizePenalty;
 }
 
 /**
@@ -475,17 +420,6 @@ function evaluateSeedingFit(
       score += (isKey ? 40 : isDesired ? 25 : 10) * scarcity;
     } else {
       score += 5 * scarcity;
-    }
-  }
-
-  // 2. Multi-talent dispersion: avoid clustering multiple versatile players (>=3 capabilities)
-  const isVersatile = (participant.capabilities || []).length >= 3;
-  if (isVersatile) {
-    const versatileCountInGroup = group.filter(
-      (m) => (m.capabilities || []).length >= 3
-    ).length;
-    if (versatileCountInGroup > 0) {
-      score -= 60 * versatileCountInGroup;
     }
   }
 
@@ -544,10 +478,7 @@ function seedInitialPartition(
       ? settings.desiredRoles
       : (ROLES.map((r) => r.id as Role));
 
-  const keyRoles: Role[] =
-    settings.keyRoles && settings.keyRoles.length > 0
-      ? settings.keyRoles
-      : desiredRoles;
+  const keyRoles = desiredRoles;
 
   const scarcityWeights = calculateRoleScarcityWeights(participants, K, desiredRoles);
 
@@ -634,7 +565,8 @@ function simulatedAnnealingSearch(
   capacities: number[],
   settings: HostSettings,
   allParticipants: Participant[],
-  prng: () => number
+  prng: () => number,
+  searchShare = 1
 ): Participant[][] {
   const K = initialPartition.length;
   if (K <= 1) {
@@ -649,11 +581,6 @@ function simulatedAnnealingSearch(
     settings.desiredRoles && settings.desiredRoles.length > 0
       ? settings.desiredRoles
       : (ROLES.map((r) => r.id as Role));
-
-  const keyRoles: Role[] =
-    settings.keyRoles && settings.keyRoles.length > 0
-      ? settings.keyRoles
-      : desiredRoles;
 
   const minRequiredRolesCount = settings.minRequiredRolesCount ?? 0;
   const scarcityWeights = calculateRoleScarcityWeights(allParticipants, K, desiredRoles);
@@ -695,7 +622,6 @@ function simulatedAnnealingSearch(
       grp,
       scarcityWeights,
       desiredRoles,
-      keyRoles,
       minRequiredRolesCount,
       weights,
       distinctGenders,
@@ -717,7 +643,7 @@ function simulatedAnnealingSearch(
   // Annealing parameters
   let T = 1.0;
   const Tmin = 0.001;
-  const alpha = 0.995;
+  const alpha = Math.pow(0.995, searchShare);
   const movesPerTemp = N <= 15 ? 2 : N <= 60 ? 3 : 2;
 
   while (T > Tmin) {
@@ -899,7 +825,8 @@ function simulatedAnnealingSearch(
 function generateGroupDiagnosticsZh(
   group: Participant[],
   consensusTags: string[],
-  desiredRoles: Role[]
+  desiredRoles: Role[],
+  assignments = assignRoles(group, desiredRoles)
 ): string[] {
   const notes: string[] = [];
   if (group.length === 0) {
@@ -930,12 +857,12 @@ function generateGroupDiagnosticsZh(
   // Missing desired roles check
   const missingDesired: string[] = [];
   for (const dr of desiredRoles) {
-    if (!roleCounts[dr] || roleCounts[dr] === 0) {
+    if (!assignments.some(a => a.role === dr)) {
       missingDesired.push(ROLE_DISPLAY_NAMES[dr] || dr);
     }
   }
-  if (missingDesired.length > 0 && missingDesired.length <= 3) {
-    notes.push(`待補強配置：缺${missingDesired.join('、缺')}`);
+  if (missingDesired.length > 0) {
+    notes.push(`待補強分工：缺${missingDesired.join('、缺')}`);
   }
 
   // 2. Music consensus & song recommendation
@@ -982,7 +909,7 @@ function generateGroupDiagnosticsZh(
     (roleCounts.cajon ?? 0) > 0 || (roleCounts.drums ?? 0) > 0;
 
   if (hasVocal && hasRhythm) {
-    notes.push('完整編制：同時具備主唱與節奏打擊，可直接組隊完整排練！');
+    notes.push('具備主唱與節奏打擊能力，請依建議分工確認排練編制。');
   } else if (hasVocal) {
     notes.push('溫暖民謠：具備主唱與吉他，適合抒情不插電自彈自唱。');
   } else if (hasRhythm) {
@@ -1021,46 +948,31 @@ export function optimizeGrouping(
     };
   }
 
-  // PRNG initialization
-  const prng = createPrng(seed !== undefined ? seed : 42);
-
-  // Group capacity planning
-  const { K, capacities } = calculateGroupCapacities(
-    participants.length,
-    settings
-  );
-
-  const desiredRoles: Role[] =
-    settings.desiredRoles && settings.desiredRoles.length > 0
-      ? settings.desiredRoles
-      : (ROLES.map((r) => r.id as Role));
-
-  const scarcityWeights = calculateRoleScarcityWeights(
-    participants,
-    K,
-    desiredRoles
-  );
-
-  // Friendly warnings
+  settings = normalizeHostSettings(settings);
+  const plans = getGroupCapacityCandidates(participants.length, settings);
+  const desiredRoles = settings.desiredRoles;
+  let finalPartition: Participant[][] = [];
+  let bestRank = -Infinity;
+  const minK = Math.min(...plans.map(p => p.K));
+  const maxK = Math.max(...plans.map(p => p.K));
+  for (const plan of plans) {
+    const seeded = seedInitialPartition(participants, plan.K, plan.capacities, settings);
+    let candidate = simulatedAnnealingSearch(seeded, plan.capacities, settings, participants, createPrng((seed ?? 42) + plan.K), plans.length > 1 ? plans.length * 2 : 1);
+    candidate = repairPartition(candidate, settings, participants);
+    const evaluation = scorePartition(candidate, settings, participants);
+    const required = Math.min(desiredRoles.length, settings.minRequiredRolesCount);
+    const deficitRate = candidate.reduce((sum, g) => sum + Math.max(0, required - assignRoles(g, desiredRoles).length), 0) / plan.K;
+    const sizeScore = maxK === minK ? 100 : settings.groupSizePreference === 'larger' ? 100 * (maxK - plan.K) / (maxK - minK) : 100 * (plan.K - minK) / (maxK - minK);
+    const strength = settings.groupSizePreference === 'any' ? 0 : settings.groupSizePreferenceWeight ?? 0.25;
+    const rank = -deficitRate * 100000 + (1 - strength) * evaluation.totalScore + strength * sizeScore;
+    if (rank > bestRank) { bestRank = rank; finalPartition = candidate; }
+  }
+  const K = finalPartition.length;
+  const scarcityWeights = calculateRoleScarcityWeights(participants, K, desiredRoles);
   const warnings = generateRoleWarnings(participants, K, settings);
-
-  // Phase 1: Constructive Seeding
-  const seededPartition = seedInitialPartition(
-    participants,
-    K,
-    capacities,
-    settings
-  );
-
-  // Phase 2: Simulated Annealing local search
-  const finalPartition = simulatedAnnealingSearch(
-    seededPartition,
-    capacities,
-    settings,
-    participants,
-    prng
-  );
-
+  if (finalPartition.some(g => g.length < (settings.minGroupSize ?? 1) || g.length > (settings.maxGroupSize ?? Infinity))) {
+    warnings.push('目前人數無法完全符合每組人數範圍，已採用人數最接近且均衡的分配。');
+  }
   // Final evaluation (canonical ground truth)
   const evaluation = scorePartition(finalPartition, settings, participants);
 
@@ -1084,7 +996,8 @@ export function optimizeGrouping(
     const diagnosticsZh = generateGroupDiagnosticsZh(
       group,
       consensusTags,
-      desiredRoles
+      desiredRoles,
+      assignRoles(group, desiredRoles, scarcityWeights)
     );
 
     return {
@@ -1094,6 +1007,7 @@ export function optimizeGrouping(
       members: group,
       consensusTags,
       roleCoverage,
+      roleAssignments: assignRoles(group, desiredRoles, scarcityWeights),
       musicScore: Math.round(musicEval.compositeScore * 10000) / 100,
       roleScore: gRoleScore,
       diagnosticsZh,
@@ -1103,18 +1017,17 @@ export function optimizeGrouping(
   // Overall room-level diagnostics
   const notesZh: string[] = [
     `全場共 ${participants.length} 位社員，分為 ${groups.length} 組，平均每組 ${(participants.length / groups.length).toFixed(1)} 人`,
-    `整體分組滿意度評分：${evaluation.totalScore} 分`,
+    `整體分組綜合評分：${evaluation.totalScore} 分`,
     `關鍵角色平均覆蓋率：${evaluation.avgRoleCoverage}%`,
     `各組最低角色滿足達標率：${evaluation.minRoleSatisfactionPct}%`,
     `音樂契合度綜合評分：${evaluation.musicScore} 分（最低組：${evaluation.worstGroupMusicScore} 分）`,
     `性別與多元背景平衡評分：${evaluation.diversityScore} 分`,
   ];
 
-  if (evaluation.penalties.talentWaste === 0) {
-    notesZh.push('多才多藝社員已均勻配置於各組，無人才浪費');
-  } else {
-    notesZh.push('部分多才社員集中，已盡力平衡各組核心戰力');
-  }
+  notesZh.push('配置評分採實際分工：每人最多一項樂器及一項人聲職責，可自彈自唱。');
+  notesZh.push('最低角色門檻優先；達標程度相同時，依曲風、多元平衡及每組人數偏好比較。');
+  notesZh.push('雜食偏好採中性 50 分，代表尚未確認共同曲風。');
+  notesZh.push(`每組人數偏好：${settings.groupSizePreference === 'larger' ? '人多一點' : settings.groupSizePreference === 'smaller' ? '人少一點' : '都可以'}（偏好權重 ${settings.groupSizePreference === 'any' ? 0 : Math.round((settings.groupSizePreferenceWeight ?? 0.25) * 100)}%）；綜合評分不含此選組數偏好。`);
 
   const diagnostics: PartitionDiagnostics = {
     avgRoleCoverage: evaluation.avgRoleCoverage,

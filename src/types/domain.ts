@@ -42,6 +42,8 @@ export type GenreGranularity = 'coarse' | 'fine';
 
 export interface HostSettings {
   targetGroupSize: number;
+  groupSizePreference?: 'larger' | 'smaller' | 'any';
+  groupSizePreferenceWeight?: number;
   minGroupSize?: number;
   maxGroupSize?: number;
   preset: PresetType;
@@ -62,6 +64,7 @@ export interface GroupResult {
   memberIds: string[];
   members: Participant[];
   consensusTags: string[];
+  roleAssignments?: { role: Role; participantId: string }[];
   roleCoverage: { role: Role; coveredBy: string[] }[];
   musicScore: number;
   roleScore: number;

@@ -178,14 +178,14 @@ describe('Hierarchical Similarity Engine', () => {
     expect(score).toBeGreaterThanOrEqual(0.7);
   });
 
-  it('any_genre wildcard yields 1.0 compatibility with any musical style', () => {
+  it('any_genre wildcard yields neutral compatibility', () => {
     // Member A has any_genre (open to anything)
     // Member B has specific niche artists (Yorushika, Wave to Earth, Polyphia)
     const score = calculateHierarchicalSimilarity(['any_genre'], ['yorushika', 'wave_to_earth', 'polyphia']);
-    expect(score).toBe(1.0);
+    expect(score).toBe(0.5);
 
     const scoreReverse = calculateHierarchicalSimilarity(['nodarty'], ['any_genre']);
-    expect(scoreReverse).toBe(1.0);
+    expect(scoreReverse).toBe(0.5);
   });
 });
 
@@ -242,7 +242,7 @@ describe('Group Music Score & Consensus Discovery', () => {
 
     const singleEval = calculateGroupMusicScore([p1]);
     expect(singleEval.avgPairwise).toBe(1.0);
-    expect(singleEval.compositeScore).toBe(1.0);
+    expect(singleEval.compositeScore).toBe(0.5);
   });
 
   it('reflects worst-pair penalty in heterogeneous groups', () => {

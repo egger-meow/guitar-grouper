@@ -6,6 +6,7 @@ import type {
   PresetType,
 } from '../types/domain';
 import { calculateGroupMusicScore } from './similarity';
+import { assignRoles } from './roles';
 import { ROLES } from './taxonomy';
 
 /**
@@ -62,50 +63,24 @@ export function calculateRoleScarcityWeights(
 }
 
 /**
- * Calculates the role coverage score for a single group with diminishing marginal utility:
- * Gain(k) = W_r / (1 + 0.8 * (k - 1))
+ * Scarcity-weighted coverage of roles that can actually be assigned.
+ * Each role contributes at most once; duplicate capabilities cannot fill gaps.
  */
 export function calculateGroupRoleScore(
   group: Participant[],
   scarcityWeights: Record<Role, number>,
-  desiredRoles: Role[]
+  desiredRoles: Role[],
+  assignments = assignRoles(group, desiredRoles, scarcityWeights)
 ): number {
   if (!group || group.length === 0 || !desiredRoles || desiredRoles.length === 0) {
     return 0;
   }
 
-  const roleCounts: Partial<Record<Role, number>> = {};
-  for (const r of desiredRoles) {
-    roleCounts[r] = 0;
-  }
-
-  for (const member of group) {
-    if (!member.capabilities) continue;
-    for (const cap of member.capabilities) {
-      if (cap in roleCounts) {
-        roleCounts[cap] = (roleCounts[cap] ?? 0) + 1;
-      }
-    }
-  }
-
-  let totalUtility = 0;
-  let targetIdealUtility = 0;
-
-  for (const r of desiredRoles) {
-    const Wr = scarcityWeights[r] ?? 1.0;
-    targetIdealUtility += Wr;
-
-    const count = roleCounts[r] ?? 0;
-    for (let k = 1; k <= count; k++) {
-      const marginalGain = Wr / (1 + 0.8 * (k - 1));
-      totalUtility += marginalGain;
-    }
-  }
-
-  if (targetIdealUtility <= 0) return 0;
-
-  const rawScore = (totalUtility / targetIdealUtility) * 100;
-  return Math.min(100, Math.round(rawScore * 100) / 100);
+  const roles = [...new Set(desiredRoles)];
+  const assigned = new Set(assignments.map(a => a.role));
+  const ideal = roles.reduce((sum, r) => sum + (scarcityWeights[r] ?? 1), 0);
+  const covered = roles.reduce((sum, r) => sum + (assigned.has(r) ? scarcityWeights[r] ?? 1 : 0), 0);
+  return ideal > 0 ? Math.round(covered / ideal * 10000) / 100 : 0;
 }
 
 /**
@@ -205,12 +180,7 @@ export function scorePartition(
       ? settings.desiredRoles
       : (ROLES.map((r) => r.id as Role));
 
-  const keyRoles: Role[] =
-    settings.keyRoles && settings.keyRoles.length > 0
-      ? settings.keyRoles
-      : desiredRoles;
-
-  const minRequiredRolesCount = settings.minRequiredRolesCount ?? 0;
+  const minRequiredRolesCount = Math.min(desiredRoles.length, Math.max(0, settings.minRequiredRolesCount ?? 0));
 
   // 1. Role Scarcity Weights
   const scarcityWeights = calculateRoleScarcityWeights(all, K, desiredRoles);
@@ -246,11 +216,11 @@ export function scorePartition(
 
   let totalDeficit = 0;
   let satisfiedGroupCount = 0;
-  let totalExcessVersatile = 0;
 
   for (const group of partition) {
     // Role score for this group
-    const gRoleScore = calculateGroupRoleScore(group, scarcityWeights, desiredRoles);
+    const assignments = assignRoles(group, desiredRoles, scarcityWeights);
+    const gRoleScore = calculateGroupRoleScore(group, scarcityWeights, desiredRoles, assignments);
     groupRoleScores.push(gRoleScore);
 
     // Music evaluation
@@ -276,30 +246,16 @@ export function scorePartition(
     }
     groupDiversityScores.push(gDivScore);
 
-    // Key roles coverage & deficit check
-    const coveredKeyRoles = new Set<Role>();
-    const coveredDesiredRoles = new Set<Role>();
-    for (const member of group) {
-      if (!member.capabilities) continue;
-      for (const cap of member.capabilities) {
-        if (keyRoles.includes(cap)) coveredKeyRoles.add(cap);
-        if (desiredRoles.includes(cap)) coveredDesiredRoles.add(cap);
-      }
-    }
-
-    const gDeficit = Math.max(0, minRequiredRolesCount - coveredKeyRoles.size);
+    // Minimum is measured against selected, assignable roles only.
+    const assignedCount = assignments.length;
+    const gDeficit = Math.max(0, minRequiredRolesCount - assignedCount);
     totalDeficit += gDeficit;
     if (gDeficit === 0) {
       satisfiedGroupCount++;
     }
 
-    const covPct = desiredRoles.length > 0 ? (coveredDesiredRoles.size / desiredRoles.length) * 100 : 100;
+    const covPct = desiredRoles.length > 0 ? (assignedCount / desiredRoles.length) * 100 : 100;
     groupCoveragePcts.push(covPct);
-
-    // Talent waste detection (versatile players with >= 3 capabilities)
-    const versatileMembers = group.filter((m) => m.capabilities && m.capabilities.length >= 3);
-    const excessVersatile = Math.max(0, versatileMembers.length - 1);
-    totalExcessVersatile += excessVersatile;
 
     // Individual group overall score (including deficit penalty)
     const gOverall = Math.max(
@@ -352,13 +308,10 @@ export function scorePartition(
   const sizePenalty = Math.round(excessSizeVariance * 10.0 * 100) / 100;
 
   // Key role deficit penalty
-  const deficitPenalty = Math.round(totalDeficit * 15.0 * 100) / 100;
+  const deficitPenalty = Math.round((totalDeficit / K) * 15.0 * 100) / 100;
 
-  // Talent waste penalty: triggers when versatile players are clustered while deficits exist
-  let wastePenalty = 0;
-  if (totalDeficit > 0 && totalExcessVersatile > 0) {
-    wastePenalty = Math.round(totalExcessVersatile * 12.0 * Math.min(2, totalDeficit) * 100) / 100;
-  }
+  // Usable role assignments already capture talent; versatility is not waste.
+  const wastePenalty = 0;
 
   const worstGroupOverallScore =
     groupOverallScores.length > 0

@@ -182,9 +182,12 @@ export function HostView({
         : (['acoustic_guitar', 'electric_guitar', 'cajon', 'drums', 'lead_vocal'] as Role[]);
     const exists = current.includes(roleId);
     const next: Role[] = exists ? current.filter((id) => id !== roleId) : [...current, roleId];
+    if (!next.length) return;
     onUpdateSettings({
       preset: 'custom',
       desiredRoles: next,
+      keyRoles: next,
+      minRequiredRolesCount: Math.min(settings.minRequiredRolesCount, next.length),
     });
   };
 
@@ -211,6 +214,7 @@ export function HostView({
       minGroupSize: currentMin,
       maxGroupSize: currentMax,
       targetGroupSize: currentTarget,
+      groupSizePreference: settings.groupSizePreference,
     }
   );
   const minCap = estimatedCapacities.length > 0 ? Math.min(...estimatedCapacities) : currentMin;
@@ -531,6 +535,24 @@ export function HostView({
               </div>
             </div>
 
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-slate-200">每組人數偏好</p>
+              <div className="flex gap-2">
+                {([['larger', '人多一點'], ['smaller', '人少一點'], ['any', '都可以']] as const).map(([value, label]) => (
+                  <button key={value} type="button" aria-pressed={(settings.groupSizePreference ?? 'any') === value}
+                    onClick={() => onUpdateSettings({ groupSizePreference: value })}
+                    className={`flex-1 rounded-xl px-3 py-2 text-sm border ${(settings.groupSizePreference ?? 'any') === value ? 'border-amber-400 bg-amber-500/20 text-amber-200' : 'border-slate-700 text-slate-400'}`}>{label}</button>
+                ))}
+              </div>
+              {(settings.groupSizePreference ?? 'any') !== 'any' && <label className="block text-xs text-slate-300">
+                人數偏好權重：{Math.round((settings.groupSizePreferenceWeight ?? 0.25) * 100)}%
+                <input aria-label="人數偏好權重" type="range" min="0" max="100" className="w-full mt-2"
+                  value={Math.round((settings.groupSizePreferenceWeight ?? 0.25) * 100)}
+                  onChange={e => onUpdateSettings({ groupSizePreferenceWeight: Number(e.target.value) / 100 })} />
+              </label>}
+              <p className="text-xs text-slate-400">先減少最低角色缺漏，再以此權重比較每組人數與其他偏好。都可以會比較範圍內所有可行組數；下方預估僅依人數，實際組數依角色及偏好決定。</p>
+            </div>
+
             {/* Presets */}
             <div className="space-y-2">
               <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider block">
@@ -569,7 +591,7 @@ export function HostView({
                     <span className="text-xl">🎸</span>
                     <div>
                       <div className="font-bold text-sm">樂器配置優先</div>
-                      <div className="text-xs text-slate-400">嚴格確保每組有主唱、吉他與節奏</div>
+                      <div className="text-xs text-slate-400">優先提高所選目標角色的完整度</div>
                     </div>
                   </div>
                   {settings.preset === 'role_focus' && <Check className="w-4 h-4 text-blue-400" />}
@@ -588,7 +610,7 @@ export function HostView({
                     <span className="text-xl">⚖️</span>
                     <div>
                       <div className="font-bold text-sm">均衡模式 (推薦)</div>
-                      <div className="text-xs text-slate-400">完美兼顧樂器完整度與曲風契合度</div>
+                      <div className="text-xs text-slate-400">兼顧樂器完整度與曲風契合度</div>
                     </div>
                   </div>
                   {settings.preset === 'balanced' && <Check className="w-4 h-4 text-emerald-400" />}
@@ -791,7 +813,7 @@ export function HostView({
                       每組最少滿足目標角色數
                     </label>
                     <div className="grid grid-cols-4 gap-2">
-                      {[1, 2, 3, 4].map((count) => {
+                      {Array.from({ length: (settings.desiredRoles || []).length }, (_, i) => i + 1).map((count) => {
                         const isSelected = (settings.minRequiredRolesCount ?? 1) === count;
                         return (
                           <button
@@ -1017,6 +1039,10 @@ export function HostView({
 
           {/* Groups Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="rounded-xl border border-slate-700 p-4 space-y-2 text-sm text-slate-300">
+              {result.warnings.map((warning, i) => <p key={i} className="text-amber-300">⚠ {warning}</p>)}
+              {result.diagnostics.notesZh.map((note, i) => <p key={`note-${i}`}>{note}</p>)}
+            </div>
             {result.groups.map((group, idx) => (
               <div
                 key={group.id}
@@ -1062,10 +1088,14 @@ export function HostView({
                 </div>
 
                 {/* Consensus Music & Diagnostics */}
+                <div className="px-4 py-3 text-xs text-slate-300 space-y-1">
+                  <p>建議分工：{(group.roleAssignments || []).map(a => `${ROLES.find(r => r.id === a.role)?.nameZh ?? a.role}：${group.members.find(m => m.id === a.participantId)?.name ?? a.participantId}`).join('、') || '尚未配置'}</p>
+                  {group.diagnosticsZh.map((note, i) => <p key={i}>{note}</p>)}
+                </div>
                 {group.consensusTags.length > 0 && (
                   <div className="pt-2 border-t border-slate-700/50 text-xs text-amber-300/90 flex items-center gap-2">
                     <Music className="w-3.5 h-3.5 shrink-0" />
-                    <span>共識風格：{group.consensusTags.join('、')}</span>
+                    <span>共識風格：{group.consensusTags.map(getTagNameZh).join('、')}</span>
                   </div>
                 )}
               </div>

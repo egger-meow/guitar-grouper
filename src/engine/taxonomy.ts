@@ -479,6 +479,8 @@ export function getTagNameZh(id: string): string {
  * Verified default host settings for guitar group optimization
  */
 export const DEFAULT_HOST_SETTINGS: HostSettings = {
+  groupSizePreference: 'any',
+  groupSizePreferenceWeight: 0.25,
   targetGroupSize: 4,
   minGroupSize: 3,
   maxGroupSize: 5,
@@ -491,7 +493,7 @@ export const DEFAULT_HOST_SETTINGS: HostSettings = {
   genreGranularity: 'fine',
   desiredRoles: ['acoustic_guitar', 'electric_guitar', 'cajon', 'drums', 'lead_vocal'],
   minRequiredRolesCount: 1,
-  keyRoles: ['acoustic_guitar', 'electric_guitar', 'cajon', 'lead_vocal'],
+  keyRoles: ['acoustic_guitar', 'electric_guitar', 'cajon', 'drums', 'lead_vocal'],
 };
 
 export const ROLE_DEFINITIONS = ROLES;

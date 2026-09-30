@@ -5,6 +5,7 @@ import {
   GroupResult,
   Role,
 } from '../src/types/domain';
+import { normalizeHostSettings } from '../src/engine/settings';
 import { optimizeGrouping } from '../src/engine/optimizer';
 import { DEFAULT_HOST_SETTINGS } from '../src/engine/taxonomy';
 
@@ -309,7 +310,7 @@ export class RoomDO {
         roomCode: body.roomCode.toUpperCase(),
         hostSecret: body.hostSecret,
         status: 'WAITING',
-        settings: body.settings ?? DEFAULT_HOST_SETTINGS,
+        settings: normalizeHostSettings(body.settings ?? DEFAULT_HOST_SETTINGS),
         participants: {},
         optimizationResult: null,
         lastActivity: Date.now(),
@@ -434,7 +435,7 @@ export class RoomDO {
       }
 
       if (body.settings) {
-        this.room.settings = { ...this.room.settings, ...body.settings };
+        this.room.settings = normalizeHostSettings({ ...this.room.settings, ...body.settings });
         await this.saveState();
         this.broadcastRoomState();
       }
@@ -474,7 +475,7 @@ export class RoomDO {
 
       // Run optimization algorithm
       const participantList = Object.values(this.room.participants);
-      const result = optimizeGrouping(participantList, this.room.settings);
+      const result = optimizeGrouping(participantList, this.room.settings, crypto.getRandomValues(new Uint32Array(1))[0]);
 
       this.room.optimizationResult = result;
       this.room.status = 'REVEALED';
@@ -624,7 +625,7 @@ export class RoomDO {
         }
 
         if (data.settings) {
-          this.room.settings = { ...this.room.settings, ...data.settings };
+          this.room.settings = normalizeHostSettings({ ...this.room.settings, ...data.settings });
           await this.saveState();
           this.broadcastRoomState();
         }
@@ -665,7 +666,7 @@ export class RoomDO {
         this.broadcast({ type: 'GROUPING_STARTED', status: 'OPTIMIZING' });
 
         const participantList = Object.values(this.room.participants);
-        const result = optimizeGrouping(participantList, this.room.settings);
+        const result = optimizeGrouping(participantList, this.room.settings, crypto.getRandomValues(new Uint32Array(1))[0]);
 
         this.room.optimizationResult = result;
         this.room.status = 'REVEALED';

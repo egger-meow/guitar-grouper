@@ -220,7 +220,7 @@ describe('Task 6: Cloudflare Durable Object Room Coordination & WebSocket Protoc
             'Content-Type': 'application/json',
             Authorization: `Bearer ${hostSecret}`,
           },
-          body: JSON.stringify({ settings: { targetGroupSize: 3 } }),
+          body: JSON.stringify({ settings: { targetGroupSize: 3, groupSizePreference: 'smaller', groupSizePreferenceWeight: .75, desiredRoles: ['cajon', 'lead_vocal'], minRequiredRolesCount: 9 } }),
         }),
         env as any,
         {} as any
@@ -228,6 +228,20 @@ describe('Task 6: Cloudflare Durable Object Room Coordination & WebSocket Protoc
       expect(goodHttpSettings.status).toBe(200);
       const updatedData = (await goodHttpSettings.json()) as any;
       expect(updatedData.settings.targetGroupSize).toBe(3);
+      expect(updatedData.settings.groupSizePreference).toBe('smaller');
+      expect(updatedData.settings.groupSizePreferenceWeight).toBe(.75);
+      expect(updatedData.settings.keyRoles).toEqual(['cajon', 'lead_vocal']);
+      expect(updatedData.settings.minRequiredRolesCount).toBe(2);
+      const settingsSocket = await worker.fetch(new Request(`http://localhost/api/room/${roomCode}/ws?hostSecret=${hostSecret}`, {
+        headers: { Upgrade: 'websocket' },
+      }), env as any, {} as any);
+      const socket = (settingsSocket as any).webSocket;
+      socket.send(JSON.stringify({ type: 'HOST_UPDATE_SETTINGS', settings: { groupSizePreference: 'larger', groupSizePreferenceWeight: .5 } }));
+      await vi.waitFor(() => {
+        const messages = socket.receivedMessages.map((message: string) => JSON.parse(message));
+        expect(messages.some((message: any) => message.type === 'ROOM_STATE' && message.settings.groupSizePreference === 'larger' && message.settings.groupSizePreferenceWeight === .5)).toBe(true);
+      });
+
     });
 
     it('authenticates unprivileged WebSocket connection using HOST_AUTH and receives host view', async () => {
@@ -351,7 +365,7 @@ describe('Task 6: Cloudflare Durable Object Room Coordination & WebSocket Protoc
             'Content-Type': 'application/json',
             Authorization: `Bearer ${hostSecret}`,
           },
-          body: JSON.stringify({ settings: { targetGroupSize: 3 } }),
+          body: JSON.stringify({ settings: { targetGroupSize: 3, groupSizePreference: 'smaller', groupSizePreferenceWeight: .75, desiredRoles: ['cajon', 'lead_vocal'], minRequiredRolesCount: 9 } }),
         }),
         env as any,
         {} as any

@@ -188,7 +188,7 @@ describe('Grouping Optimizer (Constructive Seeding + Simulated Annealing + Diagn
       expect(sizes).toEqual([4, 4, 4]);
     });
 
-    it('partitions 23 participants into sensible 4/4/5/5/5 distribution within [3, 5] range', () => {
+    it('chooses a balanced feasible partition for 23 participants within [3, 5]', () => {
       const participants: Participant[] = Array.from({ length: 23 }, (_, i) => ({
         id: `p-${i + 1}`,
         name: `社員${i + 1}`,
@@ -206,10 +206,12 @@ describe('Grouping Optimizer (Constructive Seeding + Simulated Annealing + Diagn
       };
 
       const result = optimizeGrouping(participants, settings, 42);
-      expect(result.groups.length).toBe(5);
+      expect(result.groups.length).toBeGreaterThanOrEqual(5);
+      expect(result.groups.length).toBeLessThanOrEqual(7);
 
       const sizes = result.groups.map((g) => g.members.length).sort((a, b) => b - a);
-      expect(sizes).toEqual([5, 5, 5, 4, 4]);
+      expect(sizes.reduce((sum, size) => sum + size, 0)).toBe(23);
+      expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThanOrEqual(1);
       for (const size of sizes) {
         expect(size).toBeGreaterThanOrEqual(3);
         expect(size).toBeLessThanOrEqual(5);
