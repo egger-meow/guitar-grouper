@@ -420,6 +420,34 @@ export function HostView({
         )}
       </div>
 
+      <section aria-labelledby="host-guide-title" className="rounded-3xl border border-indigo-500/30 bg-slate-900 p-5 sm:p-6 space-y-3">
+        <h2 id="host-guide-title" className="text-lg font-bold text-white">房主使用說明</h2>
+        <p className="text-sm leading-relaxed text-indigo-200">邀請成員 → 產生分組草稿 → 調整組員 → 確認發布。草稿只有房主看得到；每次修改後，都要再次發布，成員才會看到更新。</p>
+        <details className="group">
+          <summary className="cursor-pointer rounded-lg py-2 text-sm font-semibold text-slate-200 focus-visible:outline-2 focus-visible:outline-indigo-400">查看操作方式與分組機制</summary>
+          <div className="mt-3 grid gap-5 text-sm leading-relaxed text-slate-300 md:grid-cols-2">
+            <div className="space-y-2">
+              <h3 className="font-bold text-white">操作流程</h3>
+              <ol className="list-decimal space-y-2 pl-5">
+                <li>分享房間代碼或 QR Code，讓成員填寫擅長角色與喜歡的音樂。至少 2 人即可產生草稿。</li>
+                <li>設定每組人數、希望具備的角色及評分比重，再按「產生分組草稿」。</li>
+                <li>在草稿看板拖曳成員到另一組或「未分組」。手機可拖曳卡片握把，或使用卡片選單；一般移動立即儲存草稿，可按「復原上一步」撤回最近一次移動或補位。</li>
+                <li>檢查完畢後按「發布分組結果」，並確認發布。之後再調整時，成員仍看到上次發布的版本，直到你按「發布更新」。</li>
+              </ol>
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-bold text-white">新成員與分組機制</h3>
+              <ul className="list-disc space-y-2 pl-5">
+                <li>分組後仍可加入。新成員會進入「未分組」，可手動安排，或按「演算法安排未分組成員」補入現有組別；補位不會重排已分組成員。</li>
+                <li>移動與補位受每組人數上限限制。沒有空位時，可提高上限、手動騰出空位，或「全部重新分組」。低於建議人數或仍有人未分組時也可發布；未分組成員會繼續等待安排。</li>
+                <li>演算法依角色搭配、音樂偏好與多樣性比重尋找合適安排。分數與建議分工供房主參考；角色不足或偏好差異大時，無法保證每組都有完整配置。</li>
+                <li>「全部重新分組」會取代整份草稿，需確認；「返回待分組」會清除草稿與已發布結果，但保留成員與設定。</li>
+              </ul>
+            </div>
+          </div>
+        </details>
+      </section>
+
       {/* Main Grid: Left Controls, Right Participants */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Controls Column */}
