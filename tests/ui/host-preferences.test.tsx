@@ -27,7 +27,7 @@ it('preserves the other sliders after server normalization and repeated changes'
   expect(normalizeHostSettings({ ...settings, weightRatios: { role: 0, music: 0, diversity: 0 } }).weights).toEqual(DEFAULT_HOST_SETTINGS.weights);
 });
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it('updates the host size preference and its weight through the settings callback', () => {
   const update = vi.fn();
   const props = { roomCode: 'TEST', hostSecret: 'secret', participantCount: 24, participants: {}, settings: DEFAULT_HOST_SETTINGS, status: 'WAITING' as const, onStartGrouping: vi.fn(), onUpdateSettings: update };
@@ -42,16 +42,17 @@ it('updates the host size preference and its weight through the settings callbac
 
 it('shows scarcity and role diagnostics in the host results', () => {
   render(<HostView roomCode="TEST" hostSecret="secret" participantCount={0} participants={{}} settings={DEFAULT_HOST_SETTINGS}
-    status="REVEALED" onStartGrouping={vi.fn()} onUpdateSettings={vi.fn()}
+    status="REVEALED" onDraftAction={vi.fn()} onStartGrouping={vi.fn()} onUpdateSettings={vi.fn()}
     result={{ groups: [], warnings: ['至少有 1 組無法配置木箱鼓'], diagnostics: { avgRoleCoverage: 0, minRoleSatisfactionPct: 0, avgMusicScore: 0, worstGroupMusicScore: 0, diversityScore: 0, talentWasteIndex: 0, totalScore: 0, notesZh: ['配置評分採實際分工'] } }} />);
   expect(screen.getByText(/至少有 1 組/)).toBeTruthy();
   expect(screen.getByText('配置評分採實際分工')).toBeTruthy();
 });
 
 it('exposes the return-to-waiting action on completed grouping', async () => {
+  vi.stubGlobal('confirm', vi.fn(() => true));
   const reset = vi.fn().mockResolvedValue(undefined);
   render(<HostView roomCode="TEST" hostSecret="secret" participantCount={0} participants={{}} settings={DEFAULT_HOST_SETTINGS}
-    status="REVEALED" onStartGrouping={vi.fn()} onUpdateSettings={vi.fn()} onResetGrouping={reset}
+    status="REVEALED" onDraftAction={vi.fn()} onStartGrouping={vi.fn()} onUpdateSettings={vi.fn()} onResetGrouping={reset}
     result={{ groups: [], warnings: [], diagnostics: { avgRoleCoverage: 0, minRoleSatisfactionPct: 0, avgMusicScore: 0, worstGroupMusicScore: 0, diversityScore: 0, talentWasteIndex: 0, totalScore: 0, notesZh: [] } }} />);
   fireEvent.click(screen.getByRole('button', { name: '返回待分組（保留名單）' }));
   expect(reset).toHaveBeenCalledOnce();

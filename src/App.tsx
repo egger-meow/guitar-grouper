@@ -80,6 +80,7 @@ export function App() {
     participant,
     assignedGroup,
     optimizationResult,
+    draftRevision, publishedRevision, publishedResult, canUndo, draftAction,
     error: socketError,
     joinRoom,
     updateSettings,
@@ -279,6 +280,8 @@ export function App() {
             settings={settings}
             status={status}
             result={optimizationResult}
+            draftRevision={draftRevision} publishedRevision={publishedRevision} publishedResult={publishedResult}
+            canUndo={canUndo} onDraftAction={draftAction}
             onStartGrouping={startGrouping}
             onUpdateSettings={updateSettings}
             onRerunGrouping={startGrouping}

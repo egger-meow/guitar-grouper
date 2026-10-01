@@ -6,16 +6,20 @@ import {
   Role,
 } from '../src/types/domain';
 import { normalizeHostSettings } from '../src/engine/settings';
-import { optimizeGrouping } from '../src/engine/optimizer';
+import { optimizeGrouping, evaluateGrouping } from '../src/engine/optimizer';
 import { DEFAULT_HOST_SETTINGS } from '../src/engine/taxonomy';
 
 export interface RoomState {
   roomCode: string;
   hostSecret: string;
-  status: 'WAITING' | 'OPTIMIZING' | 'REVEALED';
+  status: 'WAITING' | 'OPTIMIZING' | 'DRAFT' | 'REVEALED';
   settings: HostSettings;
   participants: Record<string, Participant>;
   optimizationResult: OptimizationResult | null;
+  publishedResult?: OptimizationResult | null;
+  draftRevision?: number;
+  publishedRevision?: number;
+  undoGroups?: string[][] | null;
   lastActivity: number;
 }
 
@@ -42,6 +46,11 @@ export class RoomDO {
       const stored = await this.ctx.storage.get<RoomState>('room');
       if (stored) {
         this.room = stored;
+        if (stored.publishedResult === undefined) {
+          this.room.publishedResult = stored.status === 'REVEALED' ? structuredClone(stored.optimizationResult) : null;
+          this.room.draftRevision = stored.optimizationResult ? 1 : 0;
+          this.room.publishedRevision = stored.status === 'REVEALED' ? 1 : 0;
+        }
       }
     });
   }
@@ -95,13 +104,13 @@ export class RoomDO {
   private getParticipantView(participantId: string) {
     if (!this.room) return null;
     const participant = this.room.participants[participantId];
-    let assignedGroup: GroupResult | null | undefined = null;
+    let assignedGroup: GroupResult | null = null;
     let teammates: Participant[] = [];
 
-    if (this.room.status === 'REVEALED' && this.room.optimizationResult) {
-      assignedGroup = this.room.optimizationResult.groups.find((g) =>
+    if (this.room.publishedResult) {
+      assignedGroup = this.room.publishedResult.groups.find((g) =>
         g.memberIds.includes(participantId)
-      );
+      ) ?? null;
       if (assignedGroup) {
         teammates = assignedGroup.members.filter((m) => m.id !== participantId);
       }
@@ -109,7 +118,7 @@ export class RoomDO {
 
     return {
       roomCode: this.room.roomCode,
-      status: this.room.status,
+      status: this.room.publishedResult ? 'REVEALED' : this.room.status === 'WAITING' ? 'WAITING' : 'DRAFT',
       participantCount: Object.keys(this.room.participants).length,
       settings: this.room.settings,
       participant,
@@ -130,6 +139,10 @@ export class RoomDO {
       participants: this.room.participants,
       settings: this.room.settings,
       result: this.room.optimizationResult,
+      draftRevision: this.room.draftRevision ?? 0,
+      publishedRevision: this.room.publishedRevision ?? 0,
+      publishedResult: this.room.publishedResult,
+      canUndo: Boolean(this.room.undoGroups),
     };
   }
 
@@ -140,7 +153,7 @@ export class RoomDO {
     if (!this.room) return null;
     return {
       roomCode: this.room.roomCode,
-      status: this.room.status,
+      status: this.room.publishedResult ? 'REVEALED' : this.room.status === 'WAITING' ? 'WAITING' : 'DRAFT',
       participantCount: Object.keys(this.room.participants).length,
       settings: this.room.settings,
     };
@@ -186,37 +199,15 @@ export class RoomDO {
   /**
    * Broadcasts grouping result with personalized view for participants
    */
-  public broadcastGroupingResult(): void {
-    if (!this.room || !this.room.optimizationResult) return;
-    const sockets = this.ctx.getWebSockets();
+  public broadcastGroupingResult(): void { this.broadcastRoomState(); }
 
-    for (const ws of sockets) {
-      const att = this.getAttachment(ws);
-      if (att.participantId && this.room.participants[att.participantId]) {
-        const pView = this.getParticipantView(att.participantId);
-        try {
-          ws.send(
-            JSON.stringify({
-              type: 'GROUPING_RESULT',
-              status: 'REVEALED',
-              result: this.room.optimizationResult,
-              assignedGroup: pView?.assignedGroup,
-              teammates: pView?.teammates,
-            })
-          );
-        } catch {}
-      } else {
-        try {
-          ws.send(
-            JSON.stringify({
-              type: 'GROUPING_RESULT',
-              status: 'REVEALED',
-              result: this.room.optimizationResult,
-            })
-          );
-        } catch {}
-      }
-    }
+  private rebuildDraft(ids: string[][]): void {
+    if (!this.room?.optimizationResult) throw new Error('請先產生分組草稿');
+    const previous = this.room.optimizationResult.groups;
+    const result = evaluateGrouping(ids.map(g => g.map(id => this.room!.participants[id])), this.room.settings, Object.values(this.room.participants));
+    result.groups.forEach((g, i) => { g.id = previous[i].id; g.name = previous[i].name; });
+    this.room.optimizationResult = result;
+    this.room.draftRevision = (this.room.draftRevision ?? 0) + 1;
   }
 
   /**
@@ -269,22 +260,11 @@ export class RoomDO {
       await this.resetTTL();
 
       // Send immediate initial room state
-      if (participantId && this.room.participants[participantId]) {
+      if (isHost) {
+        server.send(JSON.stringify({ type: 'ROOM_STATE', ...this.getHostView() }));
+      } else if (participantId && this.room.participants[participantId]) {
         const pView = this.getParticipantView(participantId);
         server.send(JSON.stringify({ type: 'ROOM_STATE', ...pView }));
-        if (this.room.status === 'REVEALED') {
-          server.send(
-            JSON.stringify({
-              type: 'GROUPING_RESULT',
-              status: 'REVEALED',
-              result: this.room.optimizationResult,
-              assignedGroup: pView?.assignedGroup,
-              teammates: pView?.teammates,
-            })
-          );
-        }
-      } else if (isHost) {
-        server.send(JSON.stringify({ type: 'ROOM_STATE', ...this.getHostView() }));
       } else {
         server.send(JSON.stringify({ type: 'ROOM_STATE', ...this.getGeneralView() }));
       }
@@ -313,6 +293,7 @@ export class RoomDO {
         settings: normalizeHostSettings(body.settings ?? DEFAULT_HOST_SETTINGS),
         participants: {},
         optimizationResult: null,
+        publishedResult: null, draftRevision: 0, publishedRevision: 0, undoGroups: null,
         lastActivity: Date.now(),
       };
       await this.saveState();
@@ -363,7 +344,7 @@ export class RoomDO {
 
     // REST: Join Room
     if (path.endsWith('/join') && request.method === 'POST') {
-      if (this.room.status !== 'WAITING') {
+      if (this.room.status === 'OPTIMIZING') {
         return new Response(
           JSON.stringify({ error: 'ROOM_ALREADY_STARTED', message: 'Grouping already in progress' }),
           { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -393,13 +374,11 @@ export class RoomDO {
       };
 
       this.room.participants[id] = newParticipant;
+      if (this.room.optimizationResult) this.rebuildDraft(this.room.optimizationResult.groups.map(g => [...g.memberIds]));
       await this.saveState();
 
-      this.broadcast({
-        type: 'PARTICIPANT_JOINED',
-        participant: newParticipant,
-        participantCount: Object.keys(this.room.participants).length,
-      });
+      this.broadcast({ type: 'PARTICIPANT_JOINED', participant: newParticipant, participantCount: Object.keys(this.room.participants).length }, ws => Boolean(this.getAttachment(ws).isHost));
+      this.broadcastRoomState();
 
       return new Response(
         JSON.stringify({
@@ -436,6 +415,7 @@ export class RoomDO {
 
       if (body.settings) {
         this.room.settings = normalizeHostSettings({ ...this.room.settings, ...body.settings });
+        if (this.room.optimizationResult) this.rebuildDraft(this.room.optimizationResult.groups.map(g => [...g.memberIds]));
         await this.saveState();
         this.broadcastRoomState();
       }
@@ -457,9 +437,75 @@ export class RoomDO {
       }
       this.room.status = 'WAITING';
       this.room.optimizationResult = null;
+      this.room.publishedResult = null;
+      this.room.undoGroups = null;
+      this.room.draftRevision = (this.room.draftRevision ?? 0) + 1;
+      this.room.publishedRevision = 0;
       await this.saveState();
       this.broadcastRoomState();
       return Response.json({ success: true, status: 'WAITING' });
+    }
+
+    if (['/move', '/fill', '/undo', '/publish'].some(action => path.endsWith(action)) && request.method === 'POST') {
+      if (request.headers.get('Authorization') !== `Bearer ${this.room.hostSecret}`) return Response.json({ message: '房主驗證失敗' }, { status: 401 });
+      let body: any;
+      try { body = await request.json(); } catch { return Response.json({ message: '無效的操作資料' }, { status: 400 }); }
+      if (!body || typeof body !== 'object') return Response.json({ message: '無效的操作資料' }, { status: 400 });
+      if (this.room.status === 'OPTIMIZING' || body.revision !== (this.room.draftRevision ?? 0)) return Response.json({ message: '草稿已更新，請重新確認後再操作' }, { status: 409 });
+      const result = this.room.optimizationResult;
+      if (!result) return Response.json({ message: '請先產生分組草稿' }, { status: 400 });
+      const ids = result.groups.map(g => [...g.memberIds]);
+      if (path.endsWith('/publish')) {
+        this.room.publishedResult = structuredClone(result);
+        this.room.publishedRevision = this.room.draftRevision;
+        this.room.status = 'REVEALED';
+      } else if (path.endsWith('/undo')) {
+        if (!this.room.undoGroups) return Response.json({ message: '沒有可復原的操作' }, { status: 400 });
+        if (this.room.undoGroups.some(g => g.length > (this.room!.settings.maxGroupSize ?? 8))) return Response.json({ message: '復原會超過目前人數上限，請先調整人數設定' }, { status: 400 });
+        this.rebuildDraft(this.room.undoGroups);
+        this.room.undoGroups = null;
+      } else if (path.endsWith('/move')) {
+        const target = body.groupId === null ? -1 : result.groups.findIndex(g => g.id === body.groupId);
+        if (typeof body.participantId !== 'string' || !Object.hasOwn(this.room.participants, body.participantId) || (body.groupId !== null && target < 0)) return Response.json({ message: '找不到成員或組別' }, { status: 400 });
+        if (target >= 0 && ids[target].includes(body.participantId)) return Response.json(this.getHostView());
+        if (target >= 0 && ids[target].length >= (this.room.settings.maxGroupSize ?? 8)) return Response.json({ message: '這組已達人數上限，請先移出成員' }, { status: 400 });
+        const next = ids.map(g => g.filter(id => id !== body.participantId));
+        if (target >= 0) next[target].push(body.participantId);
+        this.room.undoGroups = ids;
+        this.rebuildDraft(next);
+      } else {
+        const assigned = new Set(ids.flat());
+        const pending = Object.values(this.room.participants).filter(p => !assigned.has(p.id));
+        const next = ids.map(g => [...g]);
+        const placements: { participant: Participant; groupIndex: number }[] = [];
+        for (const p of pending) {
+          let best = -1, bestScore = -Infinity;
+          for (let i = 0; i < next.length; i++) {
+            if (next[i].length >= (this.room.settings.maxGroupSize ?? 8)) continue;
+            const candidate = next.map((g, j) => (j === i ? [...g, p.id] : g).map(id => this.room!.participants[id]));
+            const score = evaluateGrouping(candidate, this.room.settings, Object.values(this.room.participants)).diagnostics.totalScore;
+            if (score > bestScore) { best = i; bestScore = score; }
+          }
+          if (best >= 0) {
+            next[best].push(p.id);
+            placements.push({ participant: p, groupIndex: best });
+          }
+        }
+        if (JSON.stringify(next) !== JSON.stringify(ids)) {
+          this.room.undoGroups = ids;
+          this.rebuildDraft(next);
+          for (const placement of placements) {
+            const group = this.room.optimizationResult!.groups[placement.groupIndex];
+            const before = result.groups[placement.groupIndex];
+            this.room.optimizationResult!.diagnostics.notesZh.push(
+              `補位：${placement.participant.name} → ${group.name}，依目前角色、曲風與人數綜合評分安排（該組角色 ${Math.round(before.roleScore)} → ${Math.round(group.roleScore)} 分，曲風 ${Math.round(before.musicScore)} → ${Math.round(group.musicScore)} 分）。`
+            );
+          }
+        }
+      }
+      await this.saveState();
+      this.broadcastRoomState();
+      return Response.json(this.getHostView());
     }
 
     // REST: Start Grouping (Host only)
@@ -487,21 +533,23 @@ export class RoomDO {
       }
 
       this.room.status = 'OPTIMIZING';
-      this.broadcast({ type: 'GROUPING_STARTED', status: 'OPTIMIZING' });
+      this.broadcastRoomState();
 
       // Run optimization algorithm
       const participantList = Object.values(this.room.participants);
       const result = optimizeGrouping(participantList, this.room.settings, crypto.getRandomValues(new Uint32Array(1))[0]);
 
       this.room.optimizationResult = result;
-      this.room.status = 'REVEALED';
+      this.room.status = 'DRAFT';
+      this.room.draftRevision = (this.room.draftRevision ?? 0) + 1;
+      this.room.undoGroups = null;
       await this.saveState();
 
       // Broadcast results
       this.broadcastGroupingResult();
 
       return new Response(
-        JSON.stringify({ success: true, status: 'REVEALED', result }),
+        JSON.stringify({ success: true, status: 'DRAFT', result }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -546,21 +594,10 @@ export class RoomDO {
           this.setAttachment(ws, { ...att, participantId });
           const pView = this.getParticipantView(participantId);
           ws.send(JSON.stringify({ type: 'ROOM_STATE', ...pView }));
-          if (this.room.status === 'REVEALED') {
-            ws.send(
-              JSON.stringify({
-                type: 'GROUPING_RESULT',
-                status: 'REVEALED',
-                result: this.room.optimizationResult,
-                assignedGroup: pView?.assignedGroup,
-                teammates: pView?.teammates,
-              })
-            );
-          }
           return;
         }
 
-        if (this.room.status !== 'WAITING') {
+        if (this.room.status === 'OPTIMIZING') {
           ws.send(
             JSON.stringify({
               type: 'ERROR',
@@ -582,6 +619,7 @@ export class RoomDO {
         };
 
         this.room.participants[id] = newParticipant;
+        if (this.room.optimizationResult) this.rebuildDraft(this.room.optimizationResult.groups.map(g => [...g.memberIds]));
         await this.saveState();
         this.setAttachment(ws, { ...att, participantId: id });
 
@@ -600,8 +638,9 @@ export class RoomDO {
             participant: newParticipant,
             participantCount: Object.keys(this.room.participants).length,
           },
-          (client) => client !== ws
+          (client) => client !== ws && Boolean(this.getAttachment(client).isHost)
         );
+        this.broadcastRoomState();
         break;
       }
 
@@ -642,6 +681,7 @@ export class RoomDO {
 
         if (data.settings) {
           this.room.settings = normalizeHostSettings({ ...this.room.settings, ...data.settings });
+          if (this.room.optimizationResult) this.rebuildDraft(this.room.optimizationResult.groups.map(g => [...g.memberIds]));
           await this.saveState();
           this.broadcastRoomState();
         }
@@ -679,13 +719,15 @@ export class RoomDO {
         }
 
         this.room.status = 'OPTIMIZING';
-        this.broadcast({ type: 'GROUPING_STARTED', status: 'OPTIMIZING' });
+        this.broadcastRoomState();
 
         const participantList = Object.values(this.room.participants);
         const result = optimizeGrouping(participantList, this.room.settings, crypto.getRandomValues(new Uint32Array(1))[0]);
 
         this.room.optimizationResult = result;
-        this.room.status = 'REVEALED';
+        this.room.status = 'DRAFT';
+        this.room.draftRevision = (this.room.draftRevision ?? 0) + 1;
+        this.room.undoGroups = null;
         await this.saveState();
 
         this.broadcastGroupingResult();

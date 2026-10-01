@@ -967,11 +967,18 @@ export function optimizeGrouping(
     const rank = -deficitRate * 100000 + (1 - strength) * evaluation.totalScore + strength * sizeScore;
     if (rank > bestRank) { bestRank = rank; finalPartition = candidate; }
   }
+  return evaluateGrouping(finalPartition, settings, participants);
+}
+
+/** Recalculate edited groups without moving members. */
+export function evaluateGrouping(finalPartition: Participant[][], settings: HostSettings, participants: Participant[]): OptimizationResult {
+  settings = normalizeHostSettings(settings);
+  const desiredRoles = settings.desiredRoles;
   const K = finalPartition.length;
   const scarcityWeights = calculateRoleScarcityWeights(participants, K, desiredRoles);
   const warnings = generateRoleWarnings(participants, K, settings);
   if (finalPartition.some(g => g.length < (settings.minGroupSize ?? 1) || g.length > (settings.maxGroupSize ?? Infinity))) {
-    warnings.push('目前人數無法完全符合每組人數範圍，已採用人數最接近且均衡的分配。');
+    warnings.push('目前有組別不符合建議人數範圍，可手動調整或發布目前安排。');
   }
   // Final evaluation (canonical ground truth)
   const evaluation = scorePartition(finalPartition, settings, participants);
@@ -1016,7 +1023,7 @@ export function optimizeGrouping(
 
   // Overall room-level diagnostics
   const notesZh: string[] = [
-    `全場共 ${participants.length} 位社員，分為 ${groups.length} 組，平均每組 ${(participants.length / groups.length).toFixed(1)} 人`,
+    `全場共 ${participants.length} 位社員，已安排 ${finalPartition.flat().length} 人，${participants.length - finalPartition.flat().length} 人未分組；分為 ${groups.length} 組，平均每組 ${(finalPartition.flat().length / Math.max(1, groups.length)).toFixed(1)} 人`,
     `整體分組綜合評分：${evaluation.totalScore} 分`,
     `關鍵角色平均覆蓋率：${evaluation.avgRoleCoverage}%`,
     `各組最低角色滿足達標率：${evaluation.minRoleSatisfactionPct}%`,

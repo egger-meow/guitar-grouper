@@ -31,6 +31,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
+import { GroupingBoard } from './GroupingBoard';
 import { calculateGroupCapacities } from '../engine/optimizer';
 
 export interface HostViewProps {
@@ -39,8 +40,13 @@ export interface HostViewProps {
   participantCount: number;
   participants: Record<string, Participant>;
   settings: HostSettings;
-  status: 'WAITING' | 'OPTIMIZING' | 'REVEALED';
+  status: 'WAITING' | 'OPTIMIZING' | 'DRAFT' | 'REVEALED';
   result?: OptimizationResult | null;
+  draftRevision?: number;
+  publishedRevision?: number;
+  publishedResult?: OptimizationResult | null;
+  canUndo?: boolean;
+  onDraftAction?: (action: 'move' | 'fill' | 'undo' | 'publish', payload?: Record<string, unknown>) => Promise<void>;
   onStartGrouping: () => void;
   onUpdateSettings: (settings: Partial<HostSettings>) => void;
   onRerunGrouping?: () => void;
@@ -57,6 +63,7 @@ export function HostView({
   settings,
   status,
   result,
+  draftRevision, publishedRevision, publishedResult, canUndo, onDraftAction,
   onStartGrouping,
   onUpdateSettings,
   onRerunGrouping,
@@ -78,6 +85,10 @@ export function HostView({
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
 
+  const handleStart = () => {
+    if (result && !window.confirm('將重新安排所有成員並取代目前草稿，成員仍看到上次發布的結果。確定重排？')) return;
+    onStartGrouping();
+  };
   const participantList = Object.values(participants);
   const canStart = participantCount >= 2;
 
@@ -838,7 +849,7 @@ export function HostView({
               <button
                 type="button"
                 disabled={!canStart || status === 'OPTIMIZING'}
-                onClick={onStartGrouping}
+                onClick={handleStart}
                 className={`w-full py-4 px-6 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xl ${
                   canStart && status !== 'OPTIMIZING'
                     ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-slate-950 hover:shadow-emerald-500/25 active:scale-98'
@@ -853,7 +864,7 @@ export function HostView({
                 ) : (
                   <>
                     <Play className="w-6 h-6 fill-current" />
-                    <span>🚀 開始分組</span>
+                    <span>🚀 產生分組草稿</span>
                   </>
                 )}
               </button>
@@ -968,104 +979,12 @@ export function HostView({
         </div>
       </div>
 
-      {/* Revealed Bands Overview (If Grouped) */}
-      {(status === 'REVEALED' || result) && result && (
-        <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-300 text-xs font-semibold mb-1">
-                <CheckCircle2Icon className="w-3.5 h-3.5" />
-                <span>分組已完成！</span>
-              </div>
-              <h3 className="text-2xl font-black text-white">樂團名單一覽 (Formed Bands)</h3>
-            </div>
-
-            {onResetGrouping && (
-              <button type="button" disabled={resetting || status === 'OPTIMIZING'}
-                onClick={async () => { setResetting(true); try { await onResetGrouping(); } finally { setResetting(false); } }}
-                className="rounded-xl border border-amber-700 px-4 py-2 text-sm text-amber-200 disabled:opacity-50">
-                {resetting ? '正在返回…' : '返回待分組（保留名單）'}
-              </button>
-            )}
-            {onRerunGrouping && (
-              <button
-                type="button"
-                onClick={onRerunGrouping}
-                disabled={resetting || status === 'OPTIMIZING'}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold transition-all cursor-pointer"
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span>重新演算法分配</span>
-              </button>
-            )}
-          </div>
-
-          {/* Groups Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="rounded-xl border border-slate-700 p-4 space-y-2 text-sm text-slate-300">
-              {result.warnings.map((warning, i) => <p key={i} className="text-amber-300">⚠ {warning}</p>)}
-              {result.diagnostics.notesZh.map((note, i) => <p key={`note-${i}`}>{note}</p>)}
-            </div>
-            {result.groups.map((group, idx) => (
-              <div
-                key={group.id}
-                className="bg-slate-800/80 border border-slate-700 rounded-2xl p-5 space-y-4 hover:border-emerald-500/50 transition-all"
-              >
-                <div className="flex items-center justify-between border-b border-slate-700 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
-                      {idx + 1}
-                    </span>
-                    <h4 className="font-bold text-white text-base">{group.name}</h4>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded bg-purple-900/60 text-purple-300 border border-purple-700/50">
-                      曲風: {Math.round(group.musicScore)} / 100
-                    </span>
-                    <span className="text-xs px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700/50">
-                      配置: {Math.round(group.roleScore)}分
-                    </span>
-                  </div>
-                </div>
-
-                {/* Group Members List */}
-                <div className="space-y-2">
-                  {group.members.map((member) => (
-                    <div
-                      key={member.id}
-                      className="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800 flex items-center justify-between text-xs"
-                    >
-                      <div className="font-semibold text-slate-200">{member.name}</div>
-                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        {(member.capabilities || []).map((cap) => (
-                          <span
-                            key={cap}
-                            className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/50 text-[10px]"
-                          >
-                            {getTagNameZh(cap)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Consensus Music & Diagnostics */}
-                <div className="px-4 py-3 text-xs text-slate-300 space-y-1">
-                  <p>建議分工：{(group.roleAssignments || []).map(a => `${ROLES.find(r => r.id === a.role)?.nameZh ?? a.role}：${group.members.find(m => m.id === a.participantId)?.name ?? a.participantId}`).join('、') || '尚未配置'}</p>
-                  {group.diagnosticsZh.map((note, i) => <p key={i}>{note}</p>)}
-                </div>
-                {group.consensusTags.length > 0 && (
-                  <div className="pt-2 border-t border-slate-700/50 text-xs text-amber-300/90 flex items-center gap-2">
-                    <Music className="w-3.5 h-3.5 shrink-0" />
-                    <span>共識風格：{group.consensusTags.map(getTagNameZh).join('、')}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {result && onDraftAction && <GroupingBoard result={result} participants={participants} settings={settings}
+        draftRevision={draftRevision ?? 0} publishedRevision={publishedRevision ?? 0} publishedResult={publishedResult ?? null}
+        canUndo={canUndo ?? false} onAction={onDraftAction} onRerun={onRerunGrouping} optimizing={status === 'OPTIMIZING'} />}
+      {result && onResetGrouping && <button type="button" disabled={resetting} className="text-sm text-amber-300 underline"
+        onClick={async () => { if (!window.confirm('返回待分組會清除草稿及已發布结果，保留所有成員與設定。確定返回？')) return;
+          setResetting(true); try { await onResetGrouping(); } finally { setResetting(false); } }}>返回待分組（保留名單）</button>}
 
       {/* Mobile Sticky Host Action Bar */}
       {status === 'WAITING' && (
@@ -1080,7 +999,7 @@ export function HostView({
             <button
               type="button"
               disabled={!canStart}
-              onClick={onStartGrouping}
+              onClick={handleStart}
               className={`py-3 px-5 rounded-xl font-black text-sm flex items-center gap-2 transition-all shadow-lg active:scale-95 touch-manipulation cursor-pointer ${
                 canStart
                   ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-slate-950 shadow-emerald-500/20'
@@ -1088,7 +1007,7 @@ export function HostView({
               }`}
             >
               <Play className="w-4 h-4 fill-current" />
-              <span>開始分組</span>
+              <span>產生分組草稿</span>
             </button>
           </div>
         </div>

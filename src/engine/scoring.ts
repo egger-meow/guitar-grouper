@@ -173,7 +173,6 @@ export function scorePartition(
 
   const all = allParticipants ?? partition.flat();
   const K = partition.length;
-  const N = all.length;
 
   const desiredRoles: Role[] =
     settings.desiredRoles && settings.desiredRoles.length > 0
@@ -298,7 +297,7 @@ export function scorePartition(
   const diversityScore = calculatePartitionDiversityScore(partition, all);
 
   // Group size variance penalty
-  const meanSize = N / K;
+  const meanSize = partition.reduce((sum, group) => sum + group.length, 0) / K;
   let sizeVariance = 0;
   for (const group of partition) {
     sizeVariance += Math.pow(group.length - meanSize, 2);

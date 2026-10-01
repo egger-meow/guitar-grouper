@@ -122,7 +122,7 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
       expect(screen.getByRole('button', { name: /均衡模式|平衡/i })).toBeTruthy();
 
       // Start Grouping button (available on desktop and mobile sticky bar)
-      const startBtn = screen.getAllByRole('button', { name: /開始分組/i })[0];
+      const startBtn = screen.getAllByRole('button', { name: /產生分組草稿/i })[0];
       expect(startBtn).toBeTruthy();
       expect(startBtn.hasAttribute('disabled')).toBe(false);
 
@@ -146,7 +146,7 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
         />
       );
 
-      const startBtns = screen.getAllByRole('button', { name: /開始分組/i });
+      const startBtns = screen.getAllByRole('button', { name: /產生分組草稿/i });
       expect(startBtns[0].hasAttribute('disabled')).toBe(true);
       expect(screen.getByText(/至少需要 2 位成員/i)).toBeTruthy();
     });
@@ -488,7 +488,7 @@ describe('Task 7: Modern Kahoot-Style UI Suite', () => {
         />
       );
 
-      expect(screen.getByText(/等待主辦人開始分組/i)).toBeTruthy();
+      expect(screen.getByText(/等待房主開始分組/i)).toBeTruthy();
       expect(screen.getByText('安安')).toBeTruthy();
       expect(screen.getByText(/鍵盤/i)).toBeTruthy();
 

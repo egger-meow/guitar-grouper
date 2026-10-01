@@ -15,7 +15,7 @@ import {
 export interface ParticipantViewProps {
   roomCode: string;
   participant: Participant | null;
-  status: 'WAITING' | 'OPTIMIZING' | 'REVEALED';
+  status: 'WAITING' | 'OPTIMIZING' | 'DRAFT' | 'REVEALED';
   settings?: HostSettings;
   participantCount?: number;
   onSubmit: (data: {
@@ -105,11 +105,11 @@ export function ParticipantView({
                 </span>
               </div>
             </div>
-            <h2 className="text-2xl font-black text-white">等待主辦人開始分組...</h2>
+            <h2 className="text-2xl font-black text-white">{status === 'WAITING' ? '等待房主開始分組' : '等待房主安排並發布結果'}</h2>
             <p className="text-slate-400 text-sm">
               你已經成功報名！目前全場共{' '}
               <strong className="text-emerald-400 font-bold">{participantCount ?? 1}</strong>{' '}
-              位社員在線等候，主辦人即將啟動 AI 演算法分配樂團。
+              位社員已加入。房主確認並發布後，你會在這裡看到自己的組別。
             </p>
           </div>
 

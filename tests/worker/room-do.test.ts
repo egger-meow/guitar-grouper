@@ -325,7 +325,7 @@ describe('Task 6: Cloudflare Durable Object Room Coordination & WebSocket Protoc
     const hostSocket = (hostSocketRes as any).webSocket;
     hostSocket.receivedMessages = [];
     hostSocket.send(JSON.stringify({ type: 'HOST_START_GROUPING' }));
-    await vi.waitFor(() => expect(hostSocket.receivedMessages.map((m: string) => JSON.parse(m)).some((m: any) => m.type === 'GROUPING_RESULT')).toBe(true));
+    await vi.waitFor(() => expect(hostSocket.receivedMessages.map((m: string) => JSON.parse(m)).some((m: any) => m.type === 'ROOM_STATE' && m.status === 'DRAFT')).toBe(true));
   });
 
   describe('4. Grouping Lifecycle', () => {
@@ -431,16 +431,14 @@ describe('Task 6: Cloudflare Durable Object Room Coordination & WebSocket Protoc
 
       expect(startRes.status).toBe(200);
       const startData = (await startRes.json()) as any;
-      expect(startData.status).toBe('REVEALED');
+      expect(startData.status).toBe('DRAFT');
       expect(startData.result.groups.length).toBe(2); // 6 participants / targetGroupSize 3 or 4 -> 2 groups
 
       // Connected WebSocket received GROUPING_RESULT
       await new Promise((r) => setTimeout(r, 20));
       const msgs = clientWs.receivedMessages.map((m: string) => JSON.parse(m));
-      const groupingResultMsg = msgs.find((m: any) => m.type === 'GROUPING_RESULT');
-      expect(groupingResultMsg).toBeDefined();
-      expect(groupingResultMsg.status).toBe('REVEALED');
-      expect(groupingResultMsg.result.groups.length).toBe(2);
+      expect(msgs.some((m: any) => m.result)).toBe(false);
+      expect(msgs.some((m: any) => m.status === 'DRAFT')).toBe(true);
     });
   });
 
@@ -528,6 +526,9 @@ describe('Task 6: Cloudflare Durable Object Room Coordination & WebSocket Protoc
         {} as any
       );
 
+      const hostState = await (await worker.fetch(new Request(`http://localhost/api/room/${roomCode}/state?hostSecret=${hostSecret}`), env as any, {} as any)).json() as any;
+      await worker.fetch(new Request(`http://localhost/api/room/${roomCode}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${hostSecret}` }, body: JSON.stringify({ revision: hostState.draftRevision }) }), env as any, {} as any);
+
       // Query state for participant p1
       const stateRes = await worker.fetch(
         new Request(`http://localhost/api/room/${roomCode}/state?participantId=${p1.id}`),
@@ -607,6 +608,9 @@ describe('Task 6: Cloudflare Durable Object Room Coordination & WebSocket Protoc
         env as any,
         {} as any
       );
+
+      const hostState = await (await worker.fetch(new Request(`http://localhost/api/room/${roomCode}/state?hostSecret=${hostSecret}`), env as any, {} as any)).json() as any;
+      await worker.fetch(new Request(`http://localhost/api/room/${roomCode}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${hostSecret}` }, body: JSON.stringify({ revision: hostState.draftRevision }) }), env as any, {} as any);
 
       // Reconnect via WebSocket with existing participantId
       const reconnectWsReq = new Request(
