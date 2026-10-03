@@ -182,7 +182,7 @@ export function ResultsView({
             return (
               <div
                 key={member.id}
-                className={`relative rounded-3xl p-5 border transition-all shadow-xl flex flex-col justify-between ${
+                className={`relative rounded-3xl p-4 sm:p-5 border transition-all shadow-xl flex flex-col justify-between ${
                   isMe
                     ? 'bg-slate-900 border-emerald-400/80 ring-2 ring-emerald-400/30'
                     : 'bg-slate-900 border-slate-800 hover:border-slate-700'
@@ -191,9 +191,9 @@ export function ResultsView({
                 {/* Header: Member Name and Gender badge */}
                 <div>
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <div
-                        className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-base shadow ${
+                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center font-black text-base shadow shrink-0 ${
                           isMe
                             ? 'bg-emerald-400 text-slate-950'
                             : 'bg-slate-800 text-indigo-300 border border-slate-700'
@@ -201,13 +201,13 @@ export function ResultsView({
                       >
                         {member.name.slice(0, 1)}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-white text-base">
+                          <span className="font-extrabold text-white text-base truncate">
                             {member.name}
                           </span>
                           {isMe && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
                               你
                             </span>
                           )}

@@ -115,14 +115,14 @@ export function ParticipantView({
 
           {/* Participant submitted profile summary */}
           <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700 text-left space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-700/60 pb-2">
-              <span className="text-sm font-bold text-white flex items-center gap-2">
-                <span className="text-lg">👤</span> {participant.name}
+            <div className="flex items-center justify-between gap-2 border-b border-slate-700/60 pb-2">
+              <span className="text-sm font-bold text-white flex items-center gap-2 min-w-0">
+                <span className="text-lg shrink-0">👤</span> <span className="truncate">{participant.name}</span>
               </span>
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium cursor-pointer"
+                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium cursor-pointer shrink-0 whitespace-nowrap"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>修改資料</span>
@@ -282,13 +282,13 @@ export function ParticipantView({
                   key={role.id}
                   type="button"
                   onClick={() => toggleRole(role.id)}
-                  className={`flex items-center gap-2 p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 p-2.5 sm:p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-gradient-to-r from-emerald-600/40 to-teal-600/40 border-emerald-400 text-white shadow-lg ring-1 ring-emerald-400/50'
                       : 'bg-slate-800/60 hover:bg-slate-800 border-slate-700/80 text-slate-300'
                   }`}
                 >
-                  <span className="text-lg">
+                  <span className="text-lg shrink-0">
                     {role.id === 'acoustic_guitar' && '🎸'}
                     {role.id === 'electric_guitar' && '⚡'}
                     {role.id === 'cajon' && '🥁'}
@@ -300,7 +300,7 @@ export function ParticipantView({
                     {role.id === 'other' && '➕'}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold truncate">{role.nameZh}</div>
+                    <div className="text-xs font-bold leading-tight">{role.nameZh}</div>
                   </div>
                   {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
                 </button>
@@ -378,8 +378,8 @@ export function ParticipantView({
                         : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700/80'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-bold truncate">
+                    <div className="flex items-start justify-between gap-1">
+                      <span className="text-xs font-bold leading-snug">
                         {isAny && '🌟 '}
                         {genre.nameZh}
                       </span>
@@ -523,7 +523,7 @@ export function ParticipantView({
         )}
 
         {/* Sticky Mobile Submit Bar (Fixed on phone, inline on desktop) */}
-        <div className="fixed sm:static bottom-0 left-0 right-0 p-4 sm:p-0 bg-slate-950/95 sm:bg-transparent backdrop-blur-lg sm:backdrop-blur-none border-t border-slate-800/90 sm:border-0 z-40 pb-safe shadow-2xl">
+        <div className="fixed sm:static bottom-0 left-0 right-0 p-3 sm:p-0 bg-slate-950/95 sm:bg-transparent backdrop-blur-lg sm:backdrop-blur-none border-t border-slate-800/90 sm:border-0 z-40 pb-safe shadow-2xl">
           <div className="max-w-xl mx-auto flex items-center gap-3">
             <div className="sm:hidden flex-1 min-w-0 text-left">
               <div className="text-[11px] text-slate-400 font-medium truncate">
@@ -538,7 +538,7 @@ export function ParticipantView({
             </div>
             <button
               type="submit"
-              className="flex-1 sm:w-full py-3.5 sm:py-4 px-6 rounded-2xl font-black text-base sm:text-lg bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-slate-950 hover:shadow-lg hover:shadow-emerald-500/25 active:scale-95 transition-all cursor-pointer shadow-lg shadow-emerald-500/10 touch-manipulation"
+              className="w-auto sm:w-full py-3 sm:py-4 px-5 sm:px-6 rounded-2xl font-black text-sm sm:text-lg bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-slate-950 hover:shadow-lg hover:shadow-emerald-500/25 active:scale-95 transition-all cursor-pointer shadow-lg shadow-emerald-500/10 touch-manipulation whitespace-nowrap shrink-0"
             >
               🎸 加入房間
             </button>

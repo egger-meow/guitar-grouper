@@ -115,9 +115,9 @@ export function GroupingBoard({ result, participants, settings, draftRevision, p
       <p className="text-xs text-slate-400">拖曳成員到另一組或未分組區；手機可使用成員卡片的選單。一般移動不需確認，可復原上一步。</p>
     </div>
     <div className="flex flex-wrap gap-2">
-      <button disabled={busy || !canUndo} onClick={() => void act('undo')} className="rounded-xl bg-slate-700 px-4 py-2 text-sm text-white disabled:opacity-40">復原上一步</button>
-      <button disabled={busy || !pending.length} onClick={() => void act('fill')} className="rounded-xl bg-indigo-700 px-4 py-2 text-sm text-white disabled:opacity-40">演算法安排未分組成員</button>
-      {onRerun && <button disabled={busy} onClick={() => { if (window.confirm('將重新安排所有成員並取代目前草稿，成員仍看到上次發布的結果。確定重排？')) onRerun(); }} className="rounded-xl border border-slate-600 px-4 py-2 text-sm text-slate-300 disabled:opacity-40">全部重新分組</button>}
+      <button disabled={busy || !canUndo} onClick={() => void act('undo')} className="rounded-xl bg-slate-700 px-3 sm:px-4 py-2 text-xs sm:text-sm text-white disabled:opacity-40 whitespace-nowrap">復原上一步</button>
+      <button disabled={busy || !pending.length} onClick={() => void act('fill')} className="rounded-xl bg-indigo-700 px-3 sm:px-4 py-2 text-xs sm:text-sm text-white disabled:opacity-40 whitespace-nowrap">演算法安排未分組成員</button>
+      {onRerun && <button disabled={busy} onClick={() => { if (window.confirm('將重新安排所有成員並取代目前草稿，成員仍看到上次發布的結果。確定重排？')) onRerun(); }} className="rounded-xl border border-slate-600 px-3 sm:px-4 py-2 text-xs sm:text-sm text-slate-300 disabled:opacity-40 whitespace-nowrap">全部重新分組</button>}
     </div>
     {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
     {notice && <p role="status" className="text-sm text-indigo-200">{notice}</p>}
@@ -140,9 +140,9 @@ export function GroupingBoard({ result, participants, settings, draftRevision, p
       </div>)}
     </div>
     <div className="text-xs text-slate-400 space-y-1">{result.warnings.map((w, i) => <p key={i} className="text-amber-300">{w}</p>)}{result.diagnostics.notesZh.map((n, i) => <p key={i}>{n}</p>)}</div>
-    <div className="sticky bottom-3 rounded-2xl border border-indigo-500/40 bg-slate-950/95 p-3 backdrop-blur flex items-center justify-between gap-3">
-      <span className="text-xs text-slate-300">{busy ? '正在儲存…' : `${changed} 位成員的安排有變動 · ${pending.length} 人未分組`}</span>
-      <button disabled={busy || !dirty} onClick={() => setConfirmPublish(true)} className="shrink-0 rounded-xl bg-indigo-500 px-4 py-3 font-bold text-white disabled:opacity-40">{publishedResult ? '發布更新' : '發布分組結果'}</button>
+    <div className="sticky bottom-3 rounded-2xl border border-indigo-500/40 bg-slate-950/95 p-2.5 sm:p-3 backdrop-blur flex items-center justify-between gap-2 sm:gap-3">
+      <span className="flex-1 min-w-0 text-[11px] sm:text-xs text-slate-300 line-clamp-2">{busy ? '正在儲存…' : `${changed} 位成員的安排有變動 · ${pending.length} 人未分組`}</span>
+      <button disabled={busy || !dirty} onClick={() => setConfirmPublish(true)} className="shrink-0 whitespace-nowrap rounded-xl bg-indigo-500 px-3 sm:px-4 py-2.5 sm:py-3 font-bold text-xs sm:text-sm text-white disabled:opacity-40">{publishedResult ? '發布更新' : '發布分組結果'}</button>
     </div>
     {confirmPublish && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div role="dialog" aria-modal="true" aria-labelledby="publish-title" onKeyDown={e => { if (e.key === 'Escape' && !busy) setConfirmPublish(false); }} className="max-w-md rounded-2xl border border-slate-600 bg-slate-900 p-6 space-y-4">
