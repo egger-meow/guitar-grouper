@@ -212,7 +212,7 @@ export function App() {
               </h1>
 
               <p className="text-slate-400 text-sm sm:text-base max-w-md mx-auto">
-                不用再為期初社大或成發組團傷腦筋！即時掃碼、30秒填寫樂器與音樂品味，一鍵找到最合拍的樂團夥伴！
+                不用再為新生舞台或吉他社組團傷腦筋！即時掃碼、30秒填寫樂器與音樂品味，一鍵找到最合拍的樂團夥伴！
               </p>
             </div>
 
